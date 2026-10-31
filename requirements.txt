@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+pydantic-settings
+sqlalchemy
+psycopg[binary]
+pgvector
+google-genai
+httpx
+beautifulsoup4
+pytest

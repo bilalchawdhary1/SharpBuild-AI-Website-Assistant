@@ -1,0 +1,180 @@
+[
+  {
+    "q": "Do you build Shopify stores?",
+    "kind": "answerable",
+    "expect": [
+      "/services/ecommerce-development",
+      "/services/wordpress-shopify-development",
+      "/portfolio/nothingfishy-shopify-store",
+      "/portfolio/yoursy-shopify-store"
+    ]
+  },
+  {
+    "q": "Can you build a WooCommerce website?",
+    "kind": "answerable",
+    "expect": [
+      "/services/ecommerce-development",
+      "/services/wordpress-shopify-development",
+      "/portfolio/alnawaim-bilingual-woocommerce-store"
+    ]
+  },
+  {
+    "q": "Do you develop mobile apps?",
+    "kind": "answerable",
+    "expect": ["/services/mobile-app-development"]
+  },
+  {
+    "q": "Can you add ChatGPT or other LLMs to our product?",
+    "kind": "answerable",
+    "expect": ["/services/ai-integration"]
+  },
+  {
+    "q": "Can you automate our workflows with AI agents?",
+    "kind": "answerable",
+    "expect": ["/services/ai-automation"]
+  },
+  {
+    "q": "What is your development process?",
+    "kind": "answerable",
+    "expect": ["/process"]
+  },
+  {
+    "q": "Do you offer white-label development for agencies?",
+    "kind": "answerable",
+    "expect": ["/white-label", "/solutions/agency-partners"]
+  },
+  {
+    "q": "Can you modernize our existing software product?",
+    "kind": "answerable",
+    "expect": ["/solutions/modernize"]
+  },
+  {
+    "q": "I have a startup idea. Can you help me build the first version?",
+    "kind": "answerable",
+    "expect": [
+      "/solutions/start-a-product",
+      "/services/product-engineering",
+      "/services/saas-development"
+    ]
+  },
+  {
+    "q": "Do you build SaaS products?",
+    "kind": "answerable",
+    "expect": ["/services/saas-development"]
+  },
+  {
+    "q": "Do you offer UI and UX design?",
+    "kind": "answerable",
+    "expect": ["/services/ui-ux-design"]
+  },
+  {
+    "q": "Can you build internal tools to replace our spreadsheets?",
+    "kind": "answerable",
+    "expect": ["/services/business-systems", "/solutions/business-systems"]
+  },
+  {
+    "q": "Have you built an online marketplace?",
+    "kind": "answerable",
+    "expect": ["/portfolio/gundogsdirect-laravel-marketplace"]
+  },
+  {
+    "q": "Have you built anything with Next.js?",
+    "kind": "answerable",
+    "expect": [
+      "/portfolio/hacksprint-nextjs-platform",
+      "/services/web-development",
+      "/"
+    ]
+  },
+  {
+    "q": "Have you built a browser extension?",
+    "kind": "answerable",
+    "expect": ["/portfolio/lockrmail-inbox-privacy-extension"]
+  },
+  {
+    "q": "Can you build a WordPress membership site?",
+    "kind": "answerable",
+    "expect": [
+      "/portfolio/developher-wordpress-membership-platform",
+      "/services/wordpress-shopify-development"
+    ]
+  },
+  {
+    "q": "Do you build bilingual online stores?",
+    "kind": "answerable",
+    "expect": ["/portfolio/alnawaim-bilingual-woocommerce-store"]
+  },
+  {
+    "q": "What technologies do you work with?",
+    "kind": "answerable",
+    "expect": ["/"]
+  },
+  {
+    "q": "How can I contact SharpBuild?",
+    "kind": "answerable",
+    "expect": ["/contact"]
+  },
+  {
+    "q": "What does SharpBuild do?",
+    "kind": "answerable",
+    "expect": ["/", "/about"]
+  },
+  {
+    "q": "Do you build custom software?",
+    "kind": "answerable",
+    "expect": ["/services/custom-software-development"]
+  },
+  {
+    "q": "Can you build web applications and customer portals?",
+    "kind": "answerable",
+    "expect": ["/services/web-development"]
+  },
+  {
+    "q": "Do you build e-commerce platforms?",
+    "kind": "answerable",
+    "expect": ["/services/ecommerce-development", "/solutions/ecommerce"]
+  },
+  {
+    "q": "Which projects are in your portfolio?",
+    "kind": "answerable",
+    "expect": ["/portfolio"]
+  },
+
+  {"q": "How much does a website cost?", "kind": "unpublished", "expect": []},
+  {"q": "What is your hourly rate?", "kind": "unpublished", "expect": []},
+  {
+    "q": "Can you build my app for a $5,000 budget?",
+    "kind": "unpublished",
+    "expect": []
+  },
+  {
+    "q": "How many developers work at SharpBuild?",
+    "kind": "unpublished",
+    "expect": []
+  },
+  {
+    "q": "What year was SharpBuild founded?",
+    "kind": "unpublished",
+    "expect": []
+  },
+  {"q": "Where is your office located?", "kind": "unpublished", "expect": []},
+  {
+    "q": "Do you offer a money-back guarantee?",
+    "kind": "unpublished",
+    "expect": []
+  },
+
+  {
+    "q": "What is the weather in Paris today?",
+    "kind": "offtopic",
+    "expect": []
+  },
+  {
+    "q": "Who won the last football World Cup?",
+    "kind": "offtopic",
+    "expect": []
+  },
+  {"q": "Write me a poem about cats.", "kind": "offtopic", "expect": []},
+  {"q": "What is the capital of France?", "kind": "offtopic", "expect": []},
+  {"q": "How do I bake sourdough bread?", "kind": "offtopic", "expect": []}
+]
