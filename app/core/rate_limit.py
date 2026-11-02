@@ -1,0 +1,59 @@
+"""In-memory sliding-window rate limiting (no extra dependency).
+
+Limits: one visitor (IP) and the whole service together, because the free Gemini
+quota is shared by everyone. In-memory means each server process counts on its
+own and counters reset on restart: fine for one small instance; use Redis if you
+ever run several.
+"""
+import math
+import threading
+import time
+from collections import defaultdict, deque
+from functools import lru_cache
+from typing import Callable
+
+from fastapi import Depends, HTTPException, Request
+
+from app.core.config import Settings, get_settings
+
+
+class SlidingWindowLimiter:
+    def __init__(self, limit: int, window: float = 60.0, clock: Callable[[], float] = time.monotonic):
+        self.limit, self.window, self.clock = limit, window, clock
+        self._hits: dict[str, deque[float]] = defaultdict(deque)
+        self._lock = threading.Lock()
+
+    def retry_after(self, key: str) -> float:
+        """0.0 if the request is allowed (and counted); else seconds until a slot frees up."""
+        now = self.clock()
+        with self._lock:
+            if len(self._hits) > 5000:                       # keep memory bounded
+                for k in [k for k, q in self._hits.items() if not q or now - q[-1] >= self.window]:
+                    del self._hits[k]
+            q = self._hits[key]
+            while q and now - q[0] >= self.window:
+                q.popleft()
+            if len(q) >= self.limit:
+                return self.window - (now - q[0])
+            q.append(now)
+            return 0.0
+
+
+@lru_cache
+def _limiters(per_visitor: int, overall: int) -> tuple[SlidingWindowLimiter, SlidingWindowLimiter]:
+    return SlidingWindowLimiter(per_visitor), SlidingWindowLimiter(overall)
+
+
+def rate_limit(request: Request, settings: Settings = Depends(get_settings)) -> None:
+    per_visitor, overall = _limiters(settings.rate_limit_per_minute, settings.global_rate_limit_per_minute)
+    # Behind a proxy, request.client is the proxy. Deployment must run uvicorn with
+    # --proxy-headers and a trusted proxy list; never trust X-Forwarded-For blindly.
+    visitor = request.client.host if request.client else "unknown"
+    wait = per_visitor.retry_after(visitor) or overall.retry_after("*")
+    if wait:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many questions right now. Please wait a moment and try again, "
+                   "or email hello@sharpbuild.io.",
+            headers={"Retry-After": str(math.ceil(wait))},
+        )

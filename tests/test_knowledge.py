@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.services.knowledge_service import retrieve
-from scripts.eval_retrieval import found_expected, path_of, summarize
+from scripts.eval_retrieval import check, found_expected, found_fact, path_of, summarize
 from test_embed import CHUNKS, db, fake_embed, needs_db   # noqa: F401  (db is a fixture)
 
 
@@ -34,3 +34,16 @@ def test_retrieve_returns_ordered_hits(db):
     assert hits[0].url == "https://sharpbuild.io/services/ecommerce"
     assert hits[0].similarity > hits[1].similarity
     assert 0.0 <= hits[0].similarity <= 1.0
+
+
+def test_fact_checks_and_fact_recall():
+    fact = SimpleNamespace(url="https://sharpbuild.io/contact", page_type="facts", section="Pricing and quotes")
+    page = SimpleNamespace(url="https://sharpbuild.io/services/web", page_type="services", section="Pricing and quotes")
+    assert found_fact([fact], ["Pricing and quotes"]) is True
+    assert found_fact([page], ["Pricing and quotes"]) is False        # must really be a fact chunk
+    assert check([fact], {"expect": [], "expect_fact": ["Pricing and quotes"]}) is True
+    assert check([page], {"expect": [], "expect_fact": ["Pricing and quotes"]}) is False
+    assert check([page], {"expect": [], "expect_fact": []}) is None   # nothing expected -> not scored
+    rows = [{"kind": "unpublished", "top1": 0.7, "ok": True}, {"kind": "unpublished", "top1": 0.6, "ok": False},
+            {"kind": "unpublished", "top1": 0.5, "ok": None}]
+    assert summarize(rows)["fact_recall"] == (1, 2)

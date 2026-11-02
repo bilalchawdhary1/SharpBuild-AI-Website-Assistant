@@ -39,14 +39,15 @@ def make_gemini_embedder(api_key: str, model: str, task_type: str, client=None) 
     return embed
 
 
-def with_retries(fn: EmbedFn, attempts: int = 5, base_delay: float = 5.0,
-                 sleep: Callable[[float], None] = time.sleep) -> EmbedFn:
+def with_retries(fn: Callable, attempts: int = 5, base_delay: float = 5.0,
+                 sleep: Callable[[float], None] = time.sleep) -> Callable:
     """Retry on rate-limit/temporary errors with growing waits (5s, 10s, 20s...).
-    Any other error (bad key, bad request) is raised immediately."""
-    def wrapped(texts: list[str]) -> list[list[float]]:
+    Works for any function (embedding or answering). Any other error (bad key,
+    bad request) is raised immediately."""
+    def wrapped(*args, **kwargs):
         for attempt in range(attempts):
             try:
-                return fn(texts)
+                return fn(*args, **kwargs)
             except Exception as e:
                 retryable = getattr(e, "code", None) in RETRYABLE_CODES
                 if not retryable or attempt == attempts - 1:

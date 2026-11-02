@@ -2,7 +2,8 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class ChatRequest(BaseModel):
-    message: str = Field(min_length=1, max_length=2000)
+    # Real visitor questions are short; a tight cap limits cost and prompt-injection payloads.
+    message: str = Field(min_length=1, max_length=500)
 
     @field_validator("message")
     @classmethod
@@ -22,3 +23,4 @@ class ChatSource(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     sources: list[ChatSource]
+    fallback: bool = False      # True: no grounded answer; the widget should offer human contact

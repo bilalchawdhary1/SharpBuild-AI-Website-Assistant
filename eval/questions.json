@@ -107,12 +107,14 @@
   {
     "q": "What technologies do you work with?",
     "kind": "answerable",
-    "expect": ["/"]
+    "expect": ["/"],
+    "expect_fact": ["Technologies"]
   },
   {
     "q": "How can I contact SharpBuild?",
     "kind": "answerable",
-    "expect": ["/contact"]
+    "expect": ["/contact"],
+    "expect_fact": ["Contact details"]
   },
   {
     "q": "What does SharpBuild do?",
@@ -139,31 +141,47 @@
     "kind": "answerable",
     "expect": ["/portfolio"]
   },
-
-  {"q": "How much does a website cost?", "kind": "unpublished", "expect": []},
-  {"q": "What is your hourly rate?", "kind": "unpublished", "expect": []},
+  {
+    "q": "How much does a website cost?",
+    "kind": "unpublished",
+    "expect": [],
+    "expect_fact": ["Pricing and quotes"]
+  },
+  {
+    "q": "What is your hourly rate?",
+    "kind": "unpublished",
+    "expect": [],
+    "expect_fact": ["Pricing and quotes"]
+  },
   {
     "q": "Can you build my app for a $5,000 budget?",
     "kind": "unpublished",
-    "expect": []
+    "expect": [],
+    "expect_fact": ["Pricing and quotes"]
   },
   {
     "q": "How many developers work at SharpBuild?",
     "kind": "unpublished",
-    "expect": []
+    "expect": [],
+    "expect_fact": ["Company size and history"]
   },
   {
     "q": "What year was SharpBuild founded?",
     "kind": "unpublished",
-    "expect": []
+    "expect": [],
+    "expect_fact": ["Company size and history"]
   },
-  {"q": "Where is your office located?", "kind": "unpublished", "expect": []},
+  {
+    "q": "Where is your office located?",
+    "kind": "unpublished",
+    "expect": [],
+    "expect_fact": ["Location and office"]
+  },
   {
     "q": "Do you offer a money-back guarantee?",
     "kind": "unpublished",
     "expect": []
   },
-
   {
     "q": "What is the weather in Paris today?",
     "kind": "offtopic",
@@ -176,5 +194,23 @@
   },
   {"q": "Write me a poem about cats.", "kind": "offtopic", "expect": []},
   {"q": "What is the capital of France?", "kind": "offtopic", "expect": []},
-  {"q": "How do I bake sourdough bread?", "kind": "offtopic", "expect": []}
+  {"q": "How do I bake sourdough bread?", "kind": "offtopic", "expect": []},
+  {
+    "q": "How long does a typical project take?",
+    "kind": "unpublished",
+    "expect": [],
+    "expect_fact": ["Project timelines"]
+  },
+  {
+    "q": "What is your phone number?",
+    "kind": "unpublished",
+    "expect": [],
+    "expect_fact": ["Contact details"]
+  },
+  {
+    "q": "Do you have a privacy policy?",
+    "kind": "answerable",
+    "expect": [],
+    "expect_fact": ["Privacy policy and legal pages"]
+  }
 ]
