@@ -9,9 +9,9 @@ def model(name, actions=("generateContent",)):
 
 def test_candidates_are_stable_text_flash_models_only():
     models = [model("gemini-3.1-flash-lite"), model("gemini-2.5-flash"), model("gemini-3-flash-preview"),
-              model("gemini-3.1-flash-image"), model("gemini-3.1-flash-tts-preview"),
-              model("gemini-3.1-pro"), model("gemini-embedding-001", ["embedContent"]),
-              model("gemini-2.5-flash")]                      # duplicate
+            model("gemini-3.1-flash-image"), model("gemini-3.1-flash-tts-preview"),
+            model("gemini-3.1-pro"), model("gemini-embedding-001", ["embedContent"]),
+            model("gemini-2.5-flash")]                      # duplicate
     assert candidate_models(models) == ["gemini-2.5-flash", "gemini-3.1-flash-lite"]
 
 

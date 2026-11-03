@@ -28,8 +28,10 @@ def _embedder(api_key: str, model: str):
 
 
 @lru_cache
-def _answerer(api_key: str, model: str):
-    return with_retries(make_gemini_answerer(api_key, model), **RETRY)
+def _answerer(api_key: str, model: str, fallbacks: tuple[str, ...]):
+    # No with_retries here: the fallback-model chain is the retry, and stacking both
+    # would keep a waiting visitor for minutes.
+    return make_gemini_answerer(api_key, model, fallbacks=fallbacks)
 
 
 def get_embed_query(settings: Settings = Depends(require_ai)):
@@ -37,7 +39,7 @@ def get_embed_query(settings: Settings = Depends(require_ai)):
 
 
 def get_answerer(settings: Settings = Depends(require_ai)):
-    return _answerer(settings.gemini_api_key, settings.generation_model)
+    return _answerer(settings.gemini_api_key, settings.generation_model, tuple(settings.fallback_models))
 
 
 @router.post("/chat", response_model=ChatResponse, dependencies=[Depends(rate_limit)])

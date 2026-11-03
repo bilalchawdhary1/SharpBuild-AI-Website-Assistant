@@ -184,3 +184,65 @@ def test_route_rate_limits_with_retry_after():
         assert int(blocked.headers["Retry-After"]) > 0 and "hello@sharpbuild.io" in blocked.json()["detail"]
     finally:
         app.dependency_overrides.clear()
+
+
+# ---------- backup-model chain ----------
+class ApiError(Exception):
+    def __init__(self, code):
+        self.code = code
+
+
+class SlowError(Exception):
+    pass
+
+
+SlowError.__name__ = "ReadTimeout"
+
+
+class ScriptedModels:
+    """Each model name maps to a reply text or an exception to raise."""
+    def __init__(self, outcomes):
+        self.outcomes, self.calls = outcomes, []
+
+    def generate_content(self, **kw):
+        self.calls.append(kw["model"])
+        outcome = self.outcomes[kw["model"]]
+        if isinstance(outcome, Exception):
+            raise outcome
+        return SimpleNamespace(text=outcome)
+
+
+def chain(outcomes, fallbacks):
+    models = ScriptedModels(outcomes)
+    answer = make_gemini_answerer("k", "main", client=SimpleNamespace(models=models), fallbacks=fallbacks)
+    return answer, models
+
+
+@pytest.mark.parametrize("failure", [ApiError(503), ApiError(404), ApiError(429), SlowError()])
+def test_overloaded_retired_limited_or_slow_model_falls_back_to_next(failure):
+    answer, models = chain({"main": failure, "backup": "From backup [1]"}, ["backup"])
+    assert answer("q", [hit()]) == "From backup [1]"
+    assert models.calls == ["main", "backup"]
+
+
+def test_bad_request_or_bad_key_does_not_try_other_models():
+    answer, models = chain({"main": ApiError(400), "backup": "never"}, ["backup"])
+    with pytest.raises(ApiError):
+        answer("q", [hit()])
+    assert models.calls == ["main"]
+
+
+def test_error_is_raised_when_every_model_fails_and_main_success_skips_backups():
+    answer, models = chain({"main": ApiError(503), "backup": ApiError(503)}, ["backup"])
+    with pytest.raises(ApiError):
+        answer("q", [hit()])
+    assert models.calls == ["main", "backup"]
+    answer, models = chain({"main": "ok [1]", "backup": "never"}, ["backup"])
+    assert answer("q", [hit()]) == "ok [1]" and models.calls == ["main"]
+
+
+def test_settings_parse_fallback_list():
+    from app.core.config import Settings
+    s = Settings(database_url="x", generation_fallback_models=" a , b ,, ")
+    assert s.fallback_models == ["a", "b"]
+    assert Settings(database_url="x").generation_model == "gemini-3.5-flash-lite"
