@@ -54,5 +54,13 @@
     "source_url": "https://sharpbuild.io/privacy",
     "verified_on": "2026-10-31",
     "basis": "audit_gaps contact-channel lines on /privacy, /cookies and /terms."
+  },
+  {
+    "id": "services-overview",
+    "topic": "Services overview",
+    "text": "What services does SharpBuild offer? The SharpBuild website lists these services: Product Engineering, Web Development, SaaS Development, E-commerce Development, Business Systems, Mobile App Development, AI Integration, AI Automation, Custom Software Development, UI/UX Design, and WordPress & Shopify Development. Each service has its own page on the website with details.",
+    "source_url": "https://sharpbuild.io/services",
+    "verified_on": "2026-11-03",
+    "basis": "The 11 /services/... pages found by the crawl on 2026-10-31; names from the homepage service cards and page slugs. REVIEW the exact names against the live Services page."
   }
 ]

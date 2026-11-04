@@ -9,6 +9,7 @@ from app.schemas.chat import ChatResponse, ChatSource
 from app.services.ai_service import NO_ANSWER, NO_ANSWER_MARKER, UNAVAILABLE, AnswerFn
 from app.services.embeddings import EmbedFn
 from app.services.knowledge_service import Hit, retrieve
+from app.services.smalltalk import smalltalk_reply
 
 logger = logging.getLogger("sharpbuild.chat")
 CITATION = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
@@ -46,6 +47,11 @@ def _fallback(message: str) -> ChatResponse:
 
 def answer_question(db: Session, question: str, embed_query: EmbedFn, answerer: AnswerFn,
                     *, min_similarity: float, k: int) -> ChatResponse:
+    canned = smalltalk_reply(question)
+    if canned:                               # greetings/thanks/personal chatter: no embedding, no LLM
+        logger.info("chat outcome=smalltalk question_chars=%d", len(question))
+        return ChatResponse(answer=canned, sources=[], fallback=False)
+
     started = time.perf_counter()
     outcome, top = "error", 0.0
     try:

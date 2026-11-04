@@ -1508,5 +1508,15 @@
     "chunk_index": 6,
     "word_count": 36,
     "content": "Page: SharpBuild FAQ\nSection: Privacy policy and legal pages\n\nDoes SharpBuild have a privacy policy, terms or cookie policy? The privacy, terms and cookie pages on the website currently say they are placeholders pending final legal copy. Questions about them can be sent to hello@sharpbuild.io."
+  },
+  {
+    "chunk_id": "8fb23737dd7238a7",
+    "url": "https://sharpbuild.io/services",
+    "title": "SharpBuild FAQ",
+    "page_type": "facts",
+    "section": "Services overview",
+    "chunk_index": 7,
+    "word_count": 49,
+    "content": "Page: SharpBuild FAQ\nSection: Services overview\n\nWhat services does SharpBuild offer? The SharpBuild website lists these services: Product Engineering, Web Development, SaaS Development, E-commerce Development, Business Systems, Mobile App Development, AI Integration, AI Automation, Custom Software Development, UI/UX Design, and WordPress & Shopify Development. Each service has its own page on the website with details."
   }
 ]
