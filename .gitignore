@@ -1,0 +1,23 @@
+@"
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Node
+node_modules/
+.next/
+dist/
+coverage/
+
+# IDE
+.vscode/
+.idea/
+"@ | Set-Content .gitignore

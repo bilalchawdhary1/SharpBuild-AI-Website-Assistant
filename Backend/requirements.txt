@@ -1,0 +1,8 @@
+# Runtime only: exactly what the deployed API imports (versions tested on 2026-11-03).
+# Vercel installs this file. Tests, the crawler and the dev server live in requirements-dev.txt.
+fastapi==0.161.1
+pydantic-settings==2.16.1
+SQLAlchemy==2.1.6
+psycopg[binary]==3.3.6
+pgvector==0.5.1
+google-genai==2.34.0

@@ -1,0 +1,66 @@
+[
+  {
+    "id": "pricing",
+    "topic": "Pricing and quotes",
+    "text": "How much does a website, app or project cost? SharpBuild's website does not publish prices, hourly rates or sample quotes, so there is no published answer on cost. To get an estimate for a specific project, contact SharpBuild at hello@sharpbuild.io or through the contact page. Note: the HackSprint case study mentions Free, Pro and Enterprise pricing tiers; those belong to that client's platform, not to SharpBuild's own services.",
+    "source_url": "https://sharpbuild.io/contact",
+    "verified_on": "2026-10-31",
+    "basis": "audit_gaps on 35 pages: the only pricing lines were inside client case studies (GunDogsDirect, HackSprint)."
+  },
+  {
+    "id": "timelines",
+    "topic": "Project timelines",
+    "text": "How long does a project take? The website does not state typical project durations or delivery times. The process page describes an early stage where SharpBuild learns what you want to build, who it is for and what constraints matter, including timelines. For a time estimate on a specific project, contact hello@sharpbuild.io.",
+    "source_url": "https://sharpbuild.io/process",
+    "verified_on": "2026-10-31",
+    "basis": "audit_gaps: two 'timelines' lines (process, agency-partners), neither gives a duration. REVIEW the process-page line wording before relying on this."
+  },
+  {
+    "id": "company-size",
+    "topic": "Company size and history",
+    "text": "How many developers or employees does SharpBuild have, and when was it founded? The website does not state SharpBuild's team size, founding year or number of clients served. For company questions, contact hello@sharpbuild.io.",
+    "source_url": "https://sharpbuild.io/about",
+    "verified_on": "2026-10-31",
+    "basis": "audit_gaps: no team-size or founding matches in SharpBuild's own copy (matches were client case studies)."
+  },
+  {
+    "id": "location",
+    "topic": "Location and office",
+    "text": "Where is SharpBuild based, and where is its office? The website does not state where SharpBuild is located or where its offices are. Contact hello@sharpbuild.io to ask.",
+    "source_url": "https://sharpbuild.io/contact",
+    "verified_on": "2026-10-31",
+    "basis": "audit_gaps: one match, inside a client case study. Page bodies only; nav/footer were excluded from the scan."
+  },
+  {
+    "id": "contact",
+    "topic": "Contact details",
+    "text": "How do I contact SharpBuild? The contact details published on the website are the email address hello@sharpbuild.io and the contact page at https://sharpbuild.io/contact. The website does not currently list a working phone number or WhatsApp number.",
+    "source_url": "https://sharpbuild.io/contact",
+    "verified_on": "2026-10-31",
+    "basis": "Contact page lists the email; its phone and WhatsApp entries were placeholders (X characters) when inspected."
+  },
+  {
+    "id": "technologies",
+    "topic": "Technologies",
+    "text": "What technologies does SharpBuild work with? The homepage lists, under Technologies We Work On: OpenAI APIs, AI Agents, Anthropic, n8n, Next.js, React, Laravel, PHP, Shopify, WordPress, PostgreSQL and MySQL.",
+    "source_url": "https://sharpbuild.io/",
+    "verified_on": "2026-10-31",
+    "basis": "Homepage chunk 1 in data/chunks.json."
+  },
+  {
+    "id": "legal",
+    "topic": "Privacy policy and legal pages",
+    "text": "Does SharpBuild have a privacy policy, terms or cookie policy? The privacy, terms and cookie pages on the website currently say they are placeholders pending final legal copy. Questions about them can be sent to hello@sharpbuild.io.",
+    "source_url": "https://sharpbuild.io/privacy",
+    "verified_on": "2026-10-31",
+    "basis": "audit_gaps contact-channel lines on /privacy, /cookies and /terms."
+  },
+  {
+    "id": "services-overview",
+    "topic": "Services overview",
+    "text": "What services does SharpBuild offer? The SharpBuild website lists these services: Product Engineering, Web Development, SaaS Development, E-commerce Development, Business Systems, Mobile App Development, AI Integration, AI Automation, Custom Software Development, UI/UX Design, and WordPress & Shopify Development. Each service has its own page on the website with details.",
+    "source_url": "https://sharpbuild.io/services",
+    "verified_on": "2026-11-03",
+    "basis": "The 11 /services/... pages found by the crawl on 2026-10-31; names from the homepage service cards and page slugs. REVIEW the exact names against the live Services page."
+  }
+]
