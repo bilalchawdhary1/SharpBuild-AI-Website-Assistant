@@ -1,5 +1,6 @@
 """Turns retrieved chunks into a grounded answer with Gemini."""
 import logging
+import time
 from typing import Callable, Sequence
 
 from app.services.knowledge_service import Hit
@@ -67,13 +68,18 @@ def make_gemini_answerer(api_key: str, model: str, client=None,
         contents = f"Reference material:\n{references}\n\nVisitor question:\n{question}"
         config = types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION, temperature=0.2)
         for i, name in enumerate(models):
+            attempt_started = time.perf_counter()
             try:
                 response = client.models.generate_content(model=name, contents=contents, config=config)
+                logger.info("model %s answered in %d ms", name, (time.perf_counter() - attempt_started) * 1000)
                 break
             except Exception as e:
+                ms = (time.perf_counter() - attempt_started) * 1000
+                reason = getattr(e, "code", None) or type(e).__name__
                 if i == len(models) - 1 or not _worth_trying_next_model(e):
+                    logger.error("model %s failed after %d ms (%s); giving up", name, ms, reason)
                     raise
-                logger.warning("model %s failed (%s); trying %s", name, getattr(e, "code", type(e).__name__), models[i + 1])
+                logger.warning("model %s failed after %d ms (%s); trying %s", name, ms, reason, models[i + 1])
         text = (response.text or "").strip()
         if not text:
             raise RuntimeError("Gemini returned an empty chat response")

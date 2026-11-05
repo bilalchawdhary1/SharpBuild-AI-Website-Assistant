@@ -54,14 +54,20 @@ def answer_question(db: Session, question: str, embed_query: EmbedFn, answerer: 
 
     started = time.perf_counter()
     outcome, top = "error", 0.0
+    retrieve_ms = answer_ms = 0.0
     try:
         hits = retrieve(db, question, embed_query, k=k)
+        retrieve_ms = (time.perf_counter() - started) * 1000
         top = hits[0].similarity if hits else 0.0
         relevant = [h for h in hits if h.similarity >= min_similarity]   # weak matches never reach the LLM
         if not relevant:
             outcome = "below_threshold"
             return _fallback(NO_ANSWER)
-        raw = answerer(question, relevant)
+        answer_started = time.perf_counter()
+        try:
+            raw = answerer(question, relevant)
+        finally:
+            answer_ms = (time.perf_counter() - answer_started) * 1000
         if NO_ANSWER_MARKER in raw:
             outcome = "model_no_answer"
             return _fallback(NO_ANSWER)
@@ -73,5 +79,5 @@ def answer_question(db: Session, question: str, embed_query: EmbedFn, answerer: 
         return _fallback(UNAVAILABLE)
     finally:
         # Metadata only: visitors may type personal details, so question text is not logged.
-        logger.info("chat outcome=%s top_similarity=%.3f question_chars=%d ms=%d",
-                    outcome, top, len(question), (time.perf_counter() - started) * 1000)
+        logger.info("chat outcome=%s top_similarity=%.3f question_chars=%d retrieve_ms=%d answer_ms=%d ms=%d",
+                    outcome, top, len(question), retrieve_ms, answer_ms, (time.perf_counter() - started) * 1000)
