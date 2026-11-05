@@ -15,6 +15,14 @@ logger = logging.getLogger("sharpbuild.chat")
 CITATION = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
 
 
+def _plain_text(text: str) -> str:
+    """The widget shows plain text, so markdown the model sneaks in would appear as stray symbols."""
+    text = text.replace("**", "").replace("__", "")
+    text = re.sub(r"(?m)^\s*#{1,6}\s+", "", text)                    # "## Heading" -> "Heading"
+    text = re.sub(r"(?m)^(\s*)[*\-]\s+", "\\1\u2022 ", text)            # "* item" / "- item" -> "• item"
+    return re.sub(r"(\[\d{1,2}\])\s*,\s*(?=\[\d{1,2}\])", r"\1", text)   # "[1], [2]" -> "[1][2]"
+
+
 def attach_sources(answer: str, hits: list[Hit]) -> tuple[str, list[ChatSource]]:
     """Keep only sources the answer actually cites, one per page, and renumber the
     markers so [1], [2]... match the returned source list. Invalid markers are dropped."""
@@ -34,7 +42,7 @@ def attach_sources(answer: str, hits: list[Hit]) -> tuple[str, list[ChatSource]]
                     tags.append(tag)
         return "".join(tags)
 
-    text = CITATION.sub(renumber, answer)
+    text = _plain_text(CITATION.sub(renumber, answer))
     text = re.sub(r"[ \t]{2,}", " ", text)
     text = re.sub(r"\s+([.,;:!?])", r"\1", text).strip()
     sources = [ChatSource(url=u, title=found[u].title, section=found[u].section) for u in order]
