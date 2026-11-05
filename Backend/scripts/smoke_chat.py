@@ -1,7 +1,7 @@
 """Manual end-to-end check against a RUNNING server (real Gemini, real database).
 
-Terminal 1:  uvicorn app.main:app --reload
-Terminal 2:  python -m scripts.smoke_chat
+Local:     (terminal 1) uvicorn app.main:app --reload     (terminal 2) python -m scripts.smoke_chat
+Deployed:  python -m scripts.smoke_chat https://your-api.vercel.app
 Takes ~1.5 minutes: it waits between questions to respect the per-visitor rate limit.
 PASS/FAIL = automatic check. REVIEW = read the answer yourself.
 """
@@ -10,7 +10,6 @@ import time
 
 import httpx
 
-URL = "http://127.0.0.1:8000/chat"
 DELAY = 11          # seconds between questions (limit: 6 per minute per visitor)
 
 # (question, expect_fallback or None, substrings that must NOT appear in the answer)
@@ -30,6 +29,12 @@ CASES = [
 ]
 
 
+def chat_url(argv: list[str]) -> str:
+    """Accepts nothing (local server), a site address, or a full /chat address."""
+    base = (argv[1] if len(argv) > 1 else "http://127.0.0.1:8000").strip().rstrip("/")
+    return base if base.endswith("/chat") else f"{base}/chat"
+
+
 def evaluate(expect_fallback, forbidden: list[str], body: dict) -> str:
     answer = body["answer"].lower()
     if any(f.lower() in answer for f in forbidden):
@@ -39,22 +44,31 @@ def evaluate(expect_fallback, forbidden: list[str], body: dict) -> str:
     return "PASS" if body["fallback"] is expect_fallback else f"FAIL (fallback={body['fallback']})"
 
 
-def ask(client: httpx.Client, question: str) -> httpx.Response:
-    r = client.post(URL, json={"message": question})
+def ask(client: httpx.Client, url: str, question: str) -> httpx.Response:
+    r = client.post(url, json={"message": question})
     if r.status_code == 429:
         time.sleep(int(r.headers.get("Retry-After", "10")) + 1)
-        r = client.post(URL, json={"message": question})
+        r = client.post(url, json={"message": question})
     return r
 
 
 def main() -> None:
+    url = chat_url(sys.argv)
+    print(f"Testing {url}")
     results = []
     with httpx.Client(timeout=60) as client:
+        started = time.perf_counter()
+        try:
+            health = client.get(url.removesuffix("/chat") + "/health")
+            print(f"GET /health -> HTTP {health.status_code} {health.text[:80]} "
+                  f"({int((time.perf_counter() - started) * 1000)} ms, the first request may include a cold start)")
+        except httpx.HTTPError as e:
+            sys.exit(f"Cannot reach the server: {e}")
         for i, (question, expect_fallback, forbidden) in enumerate(CASES):
             if i:
                 time.sleep(DELAY)
             started = time.perf_counter()
-            r = ask(client, question)
+            r = ask(client, url, question)
             ms = int((time.perf_counter() - started) * 1000)
             print(f"\n[{i + 1}/{len(CASES)}] {question}\n    HTTP {r.status_code} in {ms} ms")
             if r.status_code != 200:
