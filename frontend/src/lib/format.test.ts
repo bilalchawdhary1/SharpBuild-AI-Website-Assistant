@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { parseAnswer } from "./format";
+import { parseAnswer, parseInline } from "./format";
 
 it("splits paragraphs on blank lines and joins soft line breaks", () => {
   expect(parseAnswer("First line\nsame paragraph\n\nSecond paragraph")).toEqual([
@@ -26,4 +26,15 @@ it("does not mistake years, decimals or hyphenated words for lists", () => {
 it("handles empty text and Windows line endings", () => {
   expect(parseAnswer("")).toEqual([]);
   expect(parseAnswer("a\r\n\r\nb")).toEqual([{ type: "p", text: "a" }, { type: "p", text: "b" }]);
+});
+
+it("drops heading markers", () => {
+  expect(parseAnswer("## Our process\nWe start early.")).toEqual([{ type: "p", text: "Our process We start early." }]);
+});
+
+it("splits bold text and hides unmatched asterisks (text still streaming in)", () => {
+  expect(parseInline("a **b** c")).toEqual([{ text: "a ", bold: false }, { text: "b", bold: true }, { text: " c", bold: false }]);
+  expect(parseInline("Discover: **learn")).toEqual([{ text: "Discover: ", bold: false }, { text: "learn", bold: false }]);
+  expect(parseInline("**One** and **Two**").filter((s) => s.bold).map((s) => s.text)).toEqual(["One", "Two"]);
+  expect(parseInline("no markup")).toEqual([{ text: "no markup", bold: false }]);
 });

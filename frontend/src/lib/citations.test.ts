@@ -1,15 +1,16 @@
 import { expect, it } from "vitest";
-import { splitCitations } from "./citations";
+import { stripCitations } from "./citations";
 
-it("splits text and citation markers in order", () => {
-  expect(splitCitations("We do X [1][2]. Also Y [3].")).toEqual([
-    { type: "text", text: "We do X " }, { type: "cite", index: 1 }, { type: "cite", index: 2 },
-    { type: "text", text: ". Also Y " }, { type: "cite", index: 3 }, { type: "text", text: "." },
-  ]);
+it("removes markers together with the space before them", () => {
+  expect(stripCitations("We do X [1][2]. Also Y [3].")).toBe("We do X. Also Y.");
 });
 
-it("leaves text without markers alone and ignores non-citation brackets", () => {
-  expect(splitCitations("Plain answer.")).toEqual([{ type: "text", text: "Plain answer." }]);
-  expect(splitCitations("See [docs] and [a1]")).toEqual([{ type: "text", text: "See [docs] and [a1]" }]);
-  expect(splitCitations("")).toEqual([]);
+it("removes comma-separated and comma-joined markers", () => {
+  expect(stripCitations("Goals [1], [2]. More [3, 4] here")).toBe("Goals. More here");
+});
+
+it("leaves ordinary brackets and text without markers alone", () => {
+  expect(stripCitations("Plain answer.")).toBe("Plain answer.");
+  expect(stripCitations("See [docs] and [a1] and [12345]")).toBe("See [docs] and [a1] and [12345]");
+  expect(stripCitations("")).toBe("");
 });

@@ -116,3 +116,7 @@
   .root[data-open="true"] .launcher { display: none; }
   .panel { position: fixed; inset: 0; width: 100%; height: 100dvh; border-radius: 0; border: 0; }
 }
+
+/* ---------- streaming ---------- */
+.stopSquare { width: 14px; height: 14px; border-radius: 3px; background: currentColor; display: block; }
+.note { margin: 8px 0 0; font-size: 0.8rem; color: var(--muted); font-style: italic; }

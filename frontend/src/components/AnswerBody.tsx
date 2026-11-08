@@ -1,38 +1,36 @@
-import type { ChatSource } from "@/lib/chatApi";
-import { splitCitations } from "@/lib/citations";
-import { parseAnswer } from "@/lib/format";
+import { stripCitations } from "@/lib/citations";
+import { parseAnswer, parseInline } from "@/lib/format";
 import styles from "./AnswerBody.module.css";
 
-function Inline({ text, sources }: { text: string; sources: ChatSource[] }) {
+function Inline({ text }: { text: string }) {
   return (
     <>
-      {splitCitations(text).map((part, i) => {
-        if (part.type === "text") return <span key={i}>{part.text}</span>;
-        const source = sources[part.index - 1];
-        if (!source) return null; // a marker with no matching source is dropped, never shown as a dead link
-        return (
-          <sup key={i} className={styles.sup}>
-            <a href={source.url} target="_blank" rel="noopener noreferrer" className={styles.cite}
-               aria-label={`Source ${part.index}: ${source.title}`} title={source.title}>
-              {part.index}
-            </a>
-          </sup>
-        );
-      })}
+      {parseInline(text).map((segment, i) =>
+        segment.bold ? <strong key={i}>{segment.text}</strong> : <span key={i}>{segment.text}</span>,
+      )}
     </>
   );
 }
 
-export default function AnswerBody({ text, sources }: { text: string; sources: ChatSource[] }) {
+/** Renders a plain-text answer as paragraphs, lists and bold text. Every string is a React text
+ *  node, so nothing the model writes can become HTML. */
+export default function AnswerBody({ text, caret = false }: { text: string; caret?: boolean }) {
+  const blocks = parseAnswer(stripCitations(text));
+  const cursor = caret ? <span className={styles.caret} aria-hidden="true" /> : null;
+  const lastBlock = blocks.length - 1;
+
   return (
     <div className={styles.answer}>
-      {parseAnswer(text).map((block, i) => {
-        if (block.type === "p") return <p key={i}><Inline text={block.text} sources={sources} /></p>;
-        const items = block.items.map((item, j) => <li key={j}><Inline text={item} sources={sources} /></li>);
-        return block.type === "ol"
-          ? <ol key={i} start={block.start}>{items}</ol>
-          : <ul key={i}>{items}</ul>;
+      {blocks.map((block, i) => {
+        const tail = i === lastBlock ? cursor : null;
+        if (block.type === "p") return <p key={i}><Inline text={block.text} />{tail}</p>;
+        const last = block.items.length - 1;
+        const items = block.items.map((item, j) => (
+          <li key={j}><Inline text={item} />{j === last ? tail : null}</li>
+        ));
+        return block.type === "ol" ? <ol key={i} start={block.start}>{items}</ol> : <ul key={i}>{items}</ul>;
       })}
+      {blocks.length === 0 && cursor}
     </div>
   );
 }

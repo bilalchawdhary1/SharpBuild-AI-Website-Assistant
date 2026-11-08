@@ -17,7 +17,7 @@ export function parseAnswer(text: string): Block[] {
   };
 
   for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim();
+    const line = raw.trim().replace(/^#{1,6}\s+/, ""); // "## Heading" -> "Heading": no headings in a chat bubble
     if (!line) { flush(); continue; }
 
     const numbered = NUMBERED.exec(line);
@@ -38,4 +38,19 @@ export function parseAnswer(text: string): Block[] {
   }
   flush();
   return blocks;
+}
+
+export type Segment = { text: string; bold: boolean };
+
+/** Splits "a **b** c" into plain and bold pieces. An unmatched "**" (common while text is still
+ *  streaming in) is dropped instead of being shown as stray asterisks. */
+export function parseInline(text: string): Segment[] {
+  const parts = text.split("**");
+  const unmatched = (parts.length - 1) % 2 === 1;
+  const segments: Segment[] = [];
+  parts.forEach((part, i) => {
+    if (!part) return;
+    segments.push({ text: part, bold: i % 2 === 1 && !(unmatched && i === parts.length - 1) });
+  });
+  return segments;
 }

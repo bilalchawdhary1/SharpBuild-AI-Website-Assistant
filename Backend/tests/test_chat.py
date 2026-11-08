@@ -66,12 +66,12 @@ def test_answerer_fallback_without_context_and_error_on_empty_response():
 
 
 # ---------- citations -> sources ----------
-def test_attach_sources_keeps_only_cited_dedupes_pages_and_renumbers():
+def test_attach_sources_removes_markers_and_returns_cited_pages_once_in_citation_order():
     hits = [hit(1, "https://sharpbuild.io/a"), hit(2, "https://sharpbuild.io/b"),
             hit(3, "https://sharpbuild.io/a"), hit(4, "https://sharpbuild.io/c")]
     text, sources = attach_sources("We do X [3]. We also do Y [2, 1]. Ignore [9].", hits)
-    assert [s.url for s in sources] == ["https://sharpbuild.io/a", "https://sharpbuild.io/b"]
-    assert text == "We do X [1]. We also do Y [2][1]. Ignore."      # [3] and [1] are the same page; [9] dropped
+    assert text == "We do X. We also do Y. Ignore."                   # no [n] left in the visible text
+    assert [s.url for s in sources] == ["https://sharpbuild.io/a", "https://sharpbuild.io/b"]   # [3] and [1] are one page; [9] is invalid
     assert attach_sources("No citations here.", hits) == ("No citations here.", [])
 
 
@@ -151,7 +151,7 @@ def test_route_returns_answer_sources_and_fallback_flag(client):
     r = client.post("/chat", json={"message": "Shopify?"})
     assert r.status_code == 200
     body = r.json()
-    assert body["answer"] == "Yes, we do. [1]" and body["fallback"] is False
+    assert body["answer"] == "Yes, we do." and body["fallback"] is False
     assert body["sources"] == [{"url": "https://sharpbuild.io/services/ecommerce", "title": "Title 1", "section": "Section 1"}]
 
 
