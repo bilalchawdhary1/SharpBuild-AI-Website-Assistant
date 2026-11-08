@@ -1,7 +1,7 @@
 export type Block =
-  | { type: "p"; text: string }
-  | { type: "ul"; items: string[] }
-  | { type: "ol"; items: string[]; start: number };
+  | {type: "p"; text: string}
+  | {type: "ul"; items: string[]}
+  | {type: "ol"; items: string[]; start: number};
 
 const NUMBERED = /^\s*(\d{1,2})[.)]\s+(.+)$/;
 const BULLET = /^\s*[•*-]\s+(.+)$/;
@@ -12,13 +12,16 @@ export function parseAnswer(text: string): Block[] {
   const blocks: Block[] = [];
   let paragraph: string[] = [];
   const flush = () => {
-    if (paragraph.length) blocks.push({ type: "p", text: paragraph.join(" ") });
+    if (paragraph.length) blocks.push({type: "p", text: paragraph.join(" ")});
     paragraph = [];
   };
 
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim().replace(/^#{1,6}\s+/, ""); // "## Heading" -> "Heading": no headings in a chat bubble
-    if (!line) { flush(); continue; }
+    if (!line) {
+      flush();
+      continue;
+    }
 
     const numbered = NUMBERED.exec(line);
     const bullet = numbered ? null : BULLET.exec(line);
@@ -26,12 +29,19 @@ export function parseAnswer(text: string): Block[] {
 
     if (numbered) {
       flush();
-      if (last?.type === "ol" && paragraph.length === 0) last.items.push(numbered[2]);
-      else blocks.push({ type: "ol", items: [numbered[2]], start: Number(numbered[1]) });
+      if (last?.type === "ol" && paragraph.length === 0)
+        last.items.push(numbered[2]);
+      else
+        blocks.push({
+          type: "ol",
+          items: [numbered[2]],
+          start: Number(numbered[1]),
+        });
     } else if (bullet) {
       flush();
-      if (last?.type === "ul" && paragraph.length === 0) last.items.push(bullet[1]);
-      else blocks.push({ type: "ul", items: [bullet[1]] });
+      if (last?.type === "ul" && paragraph.length === 0)
+        last.items.push(bullet[1]);
+      else blocks.push({type: "ul", items: [bullet[1]]});
     } else {
       paragraph.push(line);
     }
@@ -40,7 +50,7 @@ export function parseAnswer(text: string): Block[] {
   return blocks;
 }
 
-export type Segment = { text: string; bold: boolean };
+export type Segment = {text: string; bold: boolean};
 
 /** Splits "a **b** c" into plain and bold pieces. An unmatched "**" (common while text is still
  *  streaming in) is dropped instead of being shown as stray asterisks. */
@@ -50,7 +60,10 @@ export function parseInline(text: string): Segment[] {
   const segments: Segment[] = [];
   parts.forEach((part, i) => {
     if (!part) return;
-    segments.push({ text: part, bold: i % 2 === 1 && !(unmatched && i === parts.length - 1) });
+    segments.push({
+      text: part,
+      bold: i % 2 === 1 && !(unmatched && i === parts.length - 1),
+    });
   });
   return segments;
 }

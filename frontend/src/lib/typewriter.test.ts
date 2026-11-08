@@ -1,5 +1,5 @@
-import { expect, it } from "vitest";
-import { commonPrefixLength, nextShown } from "./typewriter";
+import {expect, it} from "vitest";
+import {commonPrefixLength, nextShown} from "./typewriter";
 
 it("reveals a little at a time when little is waiting, and never overshoots", () => {
   expect(nextShown(0, 5)).toBe(2);
@@ -14,9 +14,13 @@ it("speeds up for large backlogs but caps the step so the reveal still looks typ
 });
 
 it("finishes any answer in a bounded number of steps", () => {
-  let shown = 0, steps = 0;
-  while (shown < 600) { shown = nextShown(shown, 600); steps++; }
-  expect(steps).toBeLessThan(120);       // 600 characters at 28 ms per step is under about 3.4 s
+  let shown = 0,
+    steps = 0;
+  while (shown < 600) {
+    shown = nextShown(shown, 600);
+    steps++;
+  }
+  expect(steps).toBeLessThan(120); // 600 characters at 28 ms per step is under about 3.4 s
 });
 
 it("finds how much of two strings match", () => {
