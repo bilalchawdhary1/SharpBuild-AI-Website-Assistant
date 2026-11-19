@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services.knowledge_service import retrieve
+from app.services.knowledge_service import Hit, hybrid_score, lexical_coverage, rerank_hits, retrieve
 from scripts.eval_retrieval import check, found_expected, found_fact, path_of, summarize
 from test_embed import CHUNKS, db, fake_embed, needs_db   # noqa: F401  (db is a fixture)
 
@@ -23,6 +23,27 @@ def test_summarize():
     s = summarize(rows)
     assert s["recall"] == (1, 2)
     assert s["answerable"]["min"] == 0.6 and s["offtopic"]["max"] == 0.4
+
+
+def test_hybrid_retrieval_uses_exact_term_coverage():
+    assert lexical_coverage(
+        "Do you build Shopify stores?",
+        "Shopify store development and ecommerce online stores",
+    ) == pytest.approx(1.0)
+    assert lexical_coverage(
+        "Do you build Shopify stores?",
+        "Mobile app development",
+    ) == pytest.approx(0.0)
+    assert hybrid_score(0.8, 1.0) == pytest.approx(0.83)
+
+
+def test_verified_fact_section_match_is_reranked_first():
+    fact = Hit("fact", "https://sharpbuild.io/contact", "SharpBuild FAQ",
+               "Pricing and quotes", "facts", "No prices are published.", 0.74)
+    page = Hit("page", "https://sharpbuild.io/services/web", "Web development",
+               "Pricing", "services", "Web development options.", 0.75)
+    reranked = rerank_hits("How much does a website cost?", [page, fact])
+    assert reranked[0].chunk_id == "fact"
 
 
 @needs_db

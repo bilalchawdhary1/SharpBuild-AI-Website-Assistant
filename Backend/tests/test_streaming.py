@@ -1,7 +1,14 @@
 import pytest
 
 from app.services.knowledge_service import Hit
-from app.services.streaming import CitationStripper, NoAnswerGate, sources_from_citations, stream_events
+from app.services.streaming import (
+    CitationStripper,
+    NoAnswerGate,
+    is_clarifying_question,
+    requires_grounded_source,
+    sources_from_citations,
+    stream_events,
+)
 
 
 def hit(n):
@@ -89,9 +96,15 @@ def test_stream_events_emit_clean_deltas_then_done_with_sources_in_citation_orde
 
 
 def test_stream_never_starts_with_blank_space_and_done_matches_the_streamed_text():
-    events = list(stream_events(["\n\n  ", "Hello", " there\n"], [hit(1)]))
+    events = list(stream_events(["\n\n  ", "Hello", " there [1]\n"], [hit(1)]))
     deltas = "".join(e["text"] for e in events if e["type"] == "delta")
     assert deltas.startswith("Hello") and events[-1]["answer"] == "Hello there"
+
+
+def test_uncited_generated_answer_becomes_no_answer_but_clarification_is_allowed():
+    assert requires_grounded_source("SharpBuild builds Shopify stores.") is True
+    assert requires_grounded_source("Which platform do you use?") is False
+    assert is_clarifying_question("Could you clarify the platform you need?") is True
 
 
 def test_model_saying_no_answer_ends_the_stream_before_any_text():

@@ -4,7 +4,12 @@ from types import SimpleNamespace
 import pytest
 
 from app.models.chunk import EMBEDDING_DIMS
-from app.services.embeddings import make_gemini_embedder, normalize, with_retries
+from app.services.embeddings import (
+    make_embedding_cache,
+    make_gemini_embedder,
+    normalize,
+    with_retries,
+)
 
 
 def test_normalize_gives_unit_length_and_handles_zero():
@@ -41,6 +46,23 @@ def test_gemini_embedder_rejects_wrong_number_of_embeddings():
     embed = make_gemini_embedder("key", "m", "RETRIEVAL_QUERY", client=client)
     with pytest.raises(RuntimeError):
         embed(["a", "b"])
+
+
+def test_embedding_cache_reuses_normalized_question_and_batches_misses():
+    calls = []
+
+    def embed(texts):
+        calls.append(list(texts))
+        return [[float(len(text))] for text in texts]
+
+    cached = make_embedding_cache(embed, max_entries=2)
+
+    assert cached(["  Do you build apps?  "]) == [[22.0]]
+    assert cached(["Do you build apps?"]) == [[22.0]]
+    assert calls == [["  Do you build apps?  "]]
+
+    assert cached(["Question A", "Question B"]) == [[10.0], [10.0]]
+    assert calls[-1] == ["Question A", "Question B"]
 
 
 class ApiError(Exception):

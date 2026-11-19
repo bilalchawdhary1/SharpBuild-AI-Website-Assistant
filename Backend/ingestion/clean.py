@@ -54,6 +54,13 @@ def html_to_lines(html: str) -> tuple[str, list[str]]:
 
     for tag in soup(DROP_TAGS):
         tag.decompose()
+    for tag in soup.find_all(True):
+        if tag.has_attr("hidden") or tag.get("aria-hidden") == "true":
+            tag.decompose()
+            continue
+        style = re.sub(r"\s+", "", tag.get("style", "")).lower()
+        if "display:none" in style or "visibility:hidden" in style:
+            tag.decompose()
     root = soup.find("main") or soup.body or soup
 
     # Turn <h1>-<h4> into markdown-style markers so chunking can use them later.

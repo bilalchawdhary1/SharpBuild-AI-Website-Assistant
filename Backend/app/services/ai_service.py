@@ -4,6 +4,7 @@ import time
 from typing import Callable, Iterator, Sequence
 
 from app.services.knowledge_service import Hit
+from app.schemas.chat import ChatTurn
 
 logger = logging.getLogger("sharpbuild.chat")
 
@@ -20,6 +21,8 @@ UNAVAILABLE = (
 
 SYSTEM_INSTRUCTION = f"""You are the website assistant for SharpBuild, a software development company.
 Answer visitor questions using ONLY the numbered reference material provided.
+Use the bounded conversation history only to resolve follow-up references such as "it", "that", or "what about the other option".
+Do not treat conversation history as published evidence or cite claims from history alone.
 
 Rules:
 - If the references do not contain the answer, reply with exactly: {NO_ANSWER_MARKER}
@@ -39,8 +42,8 @@ Format (the chat window renders simple markup):
 
 TYPE_LABELS = {"portfolio": "Client case study", "facts": "Verified FAQ"}
 
-AnswerFn = Callable[[str, list[Hit]], str]
-StreamFn = Callable[[str, list[Hit]], Iterator[str]]
+AnswerFn = Callable[[str, list[Hit], list[ChatTurn]], str]
+StreamFn = Callable[[str, list[Hit], list[ChatTurn]], Iterator[str]]
 
 
 def format_reference(index: int, hit: Hit) -> str:
@@ -49,12 +52,17 @@ def format_reference(index: int, hit: Hit) -> str:
             f"Section: {hit.section}\nContent:\n{hit.content}")
 
 
-def build_prompt(question: str, hits: list[Hit]) -> str:
+def build_prompt(question: str, hits: list[Hit], history: list[ChatTurn] = ()) -> str:
     references = "\n\n".join(format_reference(i, h) for i, h in enumerate(hits, start=1))
-    return f"Reference material:\n{references}\n\nVisitor question:\n{question}"
+    conversation = ""
+    if history:
+        lines = [f"{turn.role.title()}: {turn.text}" for turn in history]
+        conversation = "Conversation history:\n" + "\n".join(lines) + "\n\n"
+    return f"{conversation}Reference material:\n{references}\n\nVisitor question:\n{question}"
 
 
 FALLBACK_CODES = {404, 429, 500, 503}      # model retired, rate-limited, or overloaded
+MAX_OUTPUT_TOKENS = 400
 
 
 def _worth_trying_next_model(error: Exception) -> bool:
@@ -72,11 +80,15 @@ def make_gemini_answerer(api_key: str, model: str, client=None,
     client = client or genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=timeout_ms))
     models = [model, *fallbacks]
 
-    def answer(question: str, hits: list[Hit]) -> str:
+    def answer(question: str, hits: list[Hit], history: list[ChatTurn] = ()) -> str:
         if not hits:
             return NO_ANSWER
-        contents = build_prompt(question, hits)
-        config = types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION, temperature=0.2)
+        contents = build_prompt(question, hits, history)
+        config = types.GenerateContentConfig(
+            system_instruction=SYSTEM_INSTRUCTION,
+            temperature=0.2,
+            max_output_tokens=MAX_OUTPUT_TOKENS,
+        )
         for i, name in enumerate(models):
             attempt_started = time.perf_counter()
             try:
@@ -110,9 +122,13 @@ def make_gemini_streamer(api_key: str, model: str, client=None,
     client = client or genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=timeout_ms))
     models = [model, *fallbacks]
 
-    def stream(question: str, hits: list[Hit]) -> Iterator[str]:
-        contents = build_prompt(question, hits)
-        config = types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION, temperature=0.2)
+    def stream(question: str, hits: list[Hit], history: list[ChatTurn] = ()) -> Iterator[str]:
+        contents = build_prompt(question, hits, history)
+        config = types.GenerateContentConfig(
+            system_instruction=SYSTEM_INSTRUCTION,
+            temperature=0.2,
+            max_output_tokens=MAX_OUTPUT_TOKENS,
+        )
         for i, name in enumerate(models):
             started = time.perf_counter()
             try:

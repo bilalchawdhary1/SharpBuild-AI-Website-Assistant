@@ -1,5 +1,6 @@
 from ingestion.clean import find_boilerplate, html_to_lines
-from ingestion.crawl import normalize
+from ingestion.crawl import fetch_with_retries, normalize, sitemap_urls
+import httpx
 
 SAMPLE = """
 <html><head><title>Demo | SharpBuild</title></head><body>
@@ -40,3 +41,42 @@ def test_normalize():
     assert normalize("https://other.com/x") is None
     assert normalize("https://sharpbuild.io/logo.png") is None
     assert normalize("mailto:hello@sharpbuild.io") is None
+
+
+def test_sitemap_parser_normalizes_urls_and_reads_priority():
+    xml = """
+    <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+      <url><loc>https://sharpbuild.io/services/?a=1#top</loc><priority>0.9</priority></url>
+      <url><loc>https://sharpbuild.io/portfolio/</loc><priority>0.7</priority></url>
+      <url><loc>https://other.example/x</loc><priority>1.0</priority></url>
+    </urlset>
+    """
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(200, text=xml, request=request)
+    )
+    with httpx.Client(transport=transport) as client:
+        found = sitemap_urls(client)
+    assert found == {
+        "https://sharpbuild.io/services": 0.9,
+        "https://sharpbuild.io/portfolio": 0.7,
+    }
+
+
+def test_fetch_retries_transient_status_then_succeeds():
+    responses = [503, 503, 200]
+
+    def handler(request):
+        status = responses.pop(0)
+        return httpx.Response(status, request=request)
+
+    waits = []
+    transport = httpx.MockTransport(handler)
+    with httpx.Client(transport=transport) as client:
+        response = fetch_with_retries(
+            client,
+            "https://sharpbuild.io/",
+            base_delay=0.25,
+            sleep=waits.append,
+        )
+    assert response.status_code == 200
+    assert waits == [0.25, 0.5]

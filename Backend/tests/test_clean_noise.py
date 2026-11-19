@@ -28,6 +28,22 @@ def test_inline_link_keeps_sentence_whole():
     assert "See our process. We ship fast." in lines
 
 
+def test_hidden_and_non_visible_content_is_removed():
+    _, lines = html_to_lines(
+        "<main>"
+        "<p>Published answer</p>"
+        "<div hidden>Secret hidden text</div>"
+        "<div aria-hidden=\"true\">Screen-reader-hidden text</div>"
+        "<div style=\"display:none\">CSS hidden text</div>"
+        "<div style=\"visibility: hidden\">Invisible text</div>"
+        "</main>"
+    )
+    joined = "\n".join(lines)
+    assert "Published answer" in joined
+    assert "hidden text" not in joined
+    assert "Invisible text" not in joined
+
+
 def test_adjacent_buttons_are_not_glued_together():
     _, lines = html_to_lines(
         "<main><div><a>Alpha one</a><a>Beta two</a></div><p>Body text here.</p></main>")

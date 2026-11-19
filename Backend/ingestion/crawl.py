@@ -5,6 +5,7 @@ Run from the backend root:  python -m ingestion.crawl
 import json
 import re
 import time
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urldefrag, urljoin, urlparse
@@ -65,22 +66,64 @@ def load_robots(client: httpx.Client) -> RobotFileParser:
     return rp
 
 
+def fetch_with_retries(client: httpx.Client, url: str, *,
+                       attempts: int = 3, base_delay: float = 1.0,
+                       sleep=time.sleep) -> httpx.Response:
+    """Retry transient HTTP failures once or twice instead of skipping the page."""
+    for attempt in range(attempts):
+        try:
+            response = client.get(url)
+        except httpx.HTTPError:
+            if attempt == attempts - 1:
+                raise
+        else:
+            if response.status_code not in (429, 500, 502, 503, 504) or attempt == attempts - 1:
+                return response
+        sleep(base_delay * (2 ** attempt))
+    raise RuntimeError("unreachable")
+
+
 def sitemap_urls(client: httpx.Client, sitemap_url: str = f"{BASE_URL}/sitemap.xml",
-                 depth: int = 0) -> set[str]:
+                 depth: int = 0) -> dict[str, float]:
     try:
-        r = client.get(sitemap_url)
+        r = fetch_with_retries(client, sitemap_url)
     except httpx.HTTPError:
-        return set()
+        return {}
     if r.status_code != 200:
-        return set()
-    found: set[str] = set()
+        return {}
+    found: dict[str, float] = {}
     host = urlparse(BASE_URL).netloc
-    for loc in re.findall(r"<loc>\s*(.*?)\s*</loc>", r.text):
-        if loc.endswith(".xml"):                 # sitemap index -> follow, same host only
-            if depth < 2 and urlparse(loc).netloc == host:
-                found |= sitemap_urls(client, loc, depth + 1)
-        elif (n := normalize(loc)):
-            found.add(n)
+    try:
+        root = ET.fromstring(r.text)
+    except ET.ParseError:
+        return found
+
+    for element in root.iter():
+        name = element.tag.rsplit("}", 1)[-1]
+        if name == "sitemap":
+            loc = next((c for c in element if c.tag.rsplit("}", 1)[-1] == "loc"), None)
+            if loc is not None and loc.text and depth < 2:
+                loc_url = loc.text.strip()
+                if urlparse(loc_url).netloc == host:
+                    found.update(sitemap_urls(client, loc_url, depth + 1))
+        if name == "url":
+            loc = next((c for c in element if c.tag.rsplit("}", 1)[-1] == "loc"), None)
+            priority_element = next(
+                (c for c in element if c.tag.rsplit("}", 1)[-1] == "priority"),
+                None,
+            )
+            if loc is None or not loc.text:
+                continue
+            normalized = normalize(loc.text.strip())
+            if not normalized:
+                continue
+            priority = 0.5
+            if priority_element is not None and priority_element.text:
+                try:
+                    priority = float(priority_element.text)
+                except ValueError:
+                    pass
+            found[normalized] = priority
     return found
 
 
@@ -102,7 +145,11 @@ def crawl() -> None:
         robots = load_robots(client)
         from_sitemap = sitemap_urls(client)
         print(f"sitemap.xml URLs found: {len(from_sitemap)}")
-        queue = sorted(from_sitemap) or [normalize(BASE_URL)]
+        queue = (
+            sorted(from_sitemap, key=lambda url: (-from_sitemap[url], url))
+            if from_sitemap
+            else [normalize(BASE_URL)]
+        )
         seen: set[str] = set()
 
         while queue and len(pages) < MAX_PAGES:
@@ -115,7 +162,7 @@ def crawl() -> None:
                 continue
             time.sleep(DELAY_SECONDS)
             try:
-                r = client.get(url)
+                r = fetch_with_retries(client, url)
             except httpx.HTTPError as e:
                 print(f"ERROR {url}: {e}")
                 continue

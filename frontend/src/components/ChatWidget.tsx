@@ -63,6 +63,16 @@ type Props = {
   tickMs?: number;
 };
 
+function conversationHistory(messages: Message[]): {role: "user" | "assistant"; text: string}[] {
+  return messages
+    .filter((message): message is UserMessage | AssistantMessage =>
+      message.role === "user" ||
+      (message.role === "assistant" && !message.streaming),
+    )
+    .slice(-6)
+    .map(message => ({role: message.role, text: message.text}));
+}
+
 function errorText(error: unknown): string {
   if (error instanceof ChatApiError) {
     switch (error.kind) {
@@ -261,10 +271,12 @@ export default function ChatWidget({
         shown: 0,
       };
       streamRef.current = state;
+      const history = conversationHistory(messages);
 
       try {
         const reply = await ask(text, {
           signal: controller.signal,
+          history,
           onDelta: piece => {
             state.received += piece;
             ensureTimer();
@@ -287,7 +299,7 @@ export default function ChatWidget({
       ensureTimer();
       // eslint-disable-next-line react-hooks/exhaustive-deps
     },
-    [ask, tickMs],
+    [ask, tickMs, messages],
   );
 
   const sendRef = useRef(send);

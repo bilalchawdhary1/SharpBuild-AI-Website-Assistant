@@ -37,6 +37,14 @@ def test_big_sections_under_different_h2_stay_separate():
     assert len(c.build_chunks(page(text))) == 2
 
 
+def test_one_long_paragraph_is_split_without_losing_boundaries():
+    text = "# Big\n" + ("A useful sentence with details. " * 80)
+    chunks = c.build_chunks(page(text))
+    assert len(chunks) > 1
+    assert all(ch["word_count"] <= c.MAX_WORDS for ch in chunks)
+    assert all("# Big" in ch["content"] for ch in chunks)
+
+
 def test_tiny_pages_are_dropped():
     assert c.build_chunks(page("# Hi\nok")) == []
 

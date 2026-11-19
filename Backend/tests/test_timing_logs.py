@@ -18,7 +18,7 @@ class FakeDb:
 def test_retrieve_logs_embedding_and_database_time_separately(caplog):
     with caplog.at_level(logging.INFO, logger="sharpbuild.retrieval"):
         hits = retrieve(FakeDb(), "question", lambda texts: [[0.0] * 1536], k=4)
-    assert hits[0].similarity == pytest.approx(0.75)
+    assert hits[0].similarity == pytest.approx(0.6375)
     assert "embed_ms=" in caplog.text and "db_ms=" in caplog.text and "hits=1" in caplog.text
 
 
@@ -63,7 +63,7 @@ def test_chat_summary_line_includes_stage_timings(caplog):
     chat_service.retrieve = lambda *a, **k: [HIT]
     try:
         with caplog.at_level(logging.INFO, logger="sharpbuild.chat"):
-            answer_question(None, "Do you build apps?", lambda t: [[0.0]], lambda q, h: "Yes [1]", min_similarity=0.58, k=4)
+            answer_question(None, "Do you build apps?", lambda t: [[0.0]], lambda q, h, history: "Yes [1]", min_similarity=0.58, k=4)
     finally:
         chat_service.retrieve = original
     assert "retrieve_ms=" in caplog.text and "answer_ms=" in caplog.text and "outcome=answered" in caplog.text

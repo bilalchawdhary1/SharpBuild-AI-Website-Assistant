@@ -99,7 +99,7 @@
   grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.85fr);
   align-items: center;
   gap: clamp(48px, 8vw, 112px);
-  padding-top: 88px;
+  padding-top: 60px;
   padding-bottom: 88px;
 }
 
@@ -748,6 +748,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .navigation a,
   .visitLink svg,
   .primaryLink svg,

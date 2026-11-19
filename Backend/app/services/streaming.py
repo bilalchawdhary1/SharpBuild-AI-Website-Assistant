@@ -112,6 +112,17 @@ def sources_from_citations(cited: list[int], hits: list[Hit]) -> list[ChatSource
     return sources
 
 
+def is_clarifying_question(answer: str) -> bool:
+    """A one-sentence clarification is allowed to have no citation by prompt policy."""
+    stripped = answer.strip()
+    return stripped.endswith("?") and "\n" not in stripped
+
+
+def requires_grounded_source(answer: str) -> bool:
+    """Factual/generated answers must identify at least one retrieved source."""
+    return bool(answer.strip()) and not is_clarifying_question(answer)
+
+
 def stream_events(chunks: Iterable[str], hits: list[Hit]) -> Iterator[dict]:
     """Raw model chunks in; browser events out: {"type": "delta"|"done"|"no_answer", ...}.
     Raises if the model produced no text at all."""

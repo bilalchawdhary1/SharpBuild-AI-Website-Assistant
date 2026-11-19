@@ -82,6 +82,22 @@ def parse_blocks(text: str) -> list[Block]:
     return blocks
 
 
+def split_long_line(line: str) -> list[str]:
+    """Split an unusually large paragraph while preserving readable boundaries."""
+    if len(line.split()) <= MAX_WORDS:
+        return [line]
+
+    sentences = re.findall(r".*?(?:[.!?](?=\s|$)|$)", line)
+    parts = [sentence.strip() for sentence in sentences if sentence.strip()]
+    if len(parts) <= 1:
+        words = line.split()
+        parts = [
+            " ".join(words[index:index + TARGET_WORDS])
+            for index in range(0, len(words), TARGET_WORDS)
+        ]
+    return parts
+
+
 def split_oversize(block: Block) -> list[Block]:
     """Split a long section on line boundaries, repeating its heading and
     overlapping one line so a fact on a boundary isn't cut off from its context."""
@@ -94,13 +110,15 @@ def split_oversize(block: Block) -> list[Block]:
     group: list[str] = []
     count = 0
     for line in body:
-        w = len(line.split())
-        if group and count + w > TARGET_WORDS:
-            pieces.append(Block(block.path, block.level, head + group))
-            group = group[-1:]                          # one-line overlap
-            count = len(group[0].split())
-        group.append(line)
-        count += w
+        line_parts = split_long_line(line)
+        for part in line_parts:
+            w = len(part.split())
+            if group and count + w > TARGET_WORDS:
+                pieces.append(Block(block.path, block.level, head + group))
+                group = group[-1:]                          # one-line overlap
+                count = len(group[0].split())
+            group.append(part)
+            count += w
     if group:
         pieces.append(Block(block.path, block.level, head + group))
     return pieces

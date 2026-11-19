@@ -3,6 +3,7 @@ import pytest
 from app.services import chat_service
 from app.services.chat_service import answer_question
 from app.services.smalltalk import smalltalk_reply
+from app.services.intent import detect_intent
 
 
 @pytest.mark.parametrize("message", [
@@ -46,3 +47,20 @@ def test_pipeline_answers_smalltalk_without_retrieval_or_llm():
     finally:
         chat_service.retrieve = original
     assert r.sources == [] and r.fallback is False and "Nice to meet you" in r.answer
+
+
+@pytest.mark.parametrize(("message", "expected"), [
+    ("Hello!", "smalltalk"),
+    ("I want to talk to a human", "human_handoff"),
+    ("Can I speak with support?", "human_handoff"),
+    ("I need to build a Shopify store", "project_request"),
+    ("How much does a website cost?", "pricing"),
+    ("What is your development process?", "information"),
+])
+def test_detect_intent(message, expected):
+    assert detect_intent(message) == expected
+
+
+def test_intent_does_not_hijack_real_questions():
+    assert detect_intent("Hello, do you build Shopify stores?") == "project_request"
+    assert detect_intent("Thanks, but what is your process?") == "information"

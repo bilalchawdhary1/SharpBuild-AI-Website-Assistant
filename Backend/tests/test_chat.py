@@ -15,6 +15,7 @@ from app.services.ai_service import (NO_ANSWER, NO_ANSWER_MARKER, UNAVAILABLE,
                                      make_gemini_answerer)
 from app.services.chat_service import answer_question, attach_sources
 from app.services.knowledge_service import Hit
+from app.schemas.chat import ChatTurn
 
 
 def hit(n=1, url=None, page_type="services", sim=0.9, content="We build Shopify stores."):
@@ -29,6 +30,19 @@ def test_request_strips_message_and_rejects_blank_or_long():
         ChatRequest(message="   ")
     with pytest.raises(ValueError):
         ChatRequest(message="x" * 501)
+
+
+def test_request_accepts_bounded_conversation_history():
+    request = ChatRequest(
+        message="What about mobile apps?",
+        history=[{"role": "user", "text": "Do you build Shopify stores?"}],
+    )
+    assert request.history[0].role == "user"
+    with pytest.raises(ValueError):
+        ChatRequest(
+            message="Follow up",
+            history=[{"role": "user", "text": f"turn {i}"} for i in range(7)],
+        )
 
 
 # ---------- Gemini answerer (prompt building) ----------
@@ -55,6 +69,21 @@ def test_answerer_sends_labelled_references_and_returns_text():
     assert "[3] Type: Verified FAQ" in sent["contents"]
     assert "Do you build Shopify stores?" in sent["contents"]
     assert "Client case study" in sent["config"].system_instruction
+    assert sent["config"].max_output_tokens == 400
+
+
+def test_answerer_includes_bounded_conversation_history_in_prompt():
+    fake = FakeModels("Yes. [1]")
+    answer = make_gemini_answerer("k", "test-model", client=SimpleNamespace(models=fake))
+    history = [
+        ChatTurn(role="user", text="Do you build Shopify stores?"),
+        ChatTurn(role="assistant", text="Yes."),
+    ]
+    answer("What about mobile apps?", [hit()], history)
+    contents = fake.calls[0]["contents"]
+    assert "Conversation history:" in contents
+    assert "User: Do you build Shopify stores?" in contents
+    assert "Assistant: Yes." in contents
 
 
 def test_answerer_fallback_without_context_and_error_on_empty_response():
@@ -90,7 +119,7 @@ def restore_retrieve():
 
 
 def test_weak_matches_never_reach_the_llm():
-    def answerer(q, hits):
+    def answerer(q, hits, history):
         pytest.fail("LLM must not be called below the threshold")
     r = run([hit(1, sim=0.54), hit(2, sim=0.50)], answerer)
     assert r.fallback and r.answer == NO_ANSWER and r.sources == []
@@ -99,7 +128,7 @@ def test_weak_matches_never_reach_the_llm():
 
 def test_only_relevant_hits_are_passed_as_evidence():
     seen = []
-    def answerer(q, hits):
+    def answerer(q, hits, history):
         seen.extend(hits)
         return "Yes [1]"
     r = run([hit(1, sim=0.70), hit(2, sim=0.60), hit(3, sim=0.50)], answerer)
@@ -108,12 +137,22 @@ def test_only_relevant_hits_are_passed_as_evidence():
 
 
 def test_model_saying_no_answer_becomes_a_fallback():
-    r = run([hit()], lambda q, h: NO_ANSWER_MARKER)
+    r = run([hit()], lambda q, h, history: NO_ANSWER_MARKER)
     assert r.fallback and r.answer == NO_ANSWER and r.sources == []
 
 
+def test_uncited_generated_answer_becomes_a_fallback():
+    r = run([hit()], lambda q, h, history: "SharpBuild builds mobile apps.")
+    assert r.fallback and r.answer == NO_ANSWER and r.sources == []
+
+
+def test_clarifying_question_without_citation_is_preserved():
+    r = run([hit()], lambda q, h, history: "Which platform do you need?")
+    assert not r.fallback and r.answer == "Which platform do you need?" and r.sources == []
+
+
 def test_llm_failure_degrades_gracefully_and_is_logged(caplog):
-    def answerer(q, hits):
+    def answerer(q, hits, history):
         raise RuntimeError("503 from Gemini")
     with caplog.at_level(logging.INFO, logger="sharpbuild.chat"):
         r = run([hit()], answerer)
@@ -124,7 +163,7 @@ def test_llm_failure_degrades_gracefully_and_is_logged(caplog):
 def test_logs_metadata_but_never_the_question_text(caplog):
     with caplog.at_level(logging.INFO, logger="sharpbuild.chat"):
         chat_service.retrieve = lambda *a, **k: [hit()]
-        answer_question(None, "my secret phone is 555-0100", lambda t: [[0.0]], lambda q, h: "Yes [1]",
+        answer_question(None, "my secret phone is 555-0100", lambda t: [[0.0]], lambda q, h, history: "Yes [1]",
                         min_similarity=0.58, k=4)
     assert "outcome=answered" in caplog.text and "555-0100" not in caplog.text
 
@@ -140,7 +179,7 @@ def client():
     app.dependency_overrides[get_settings] = lambda: CFG
     app.dependency_overrides[get_db] = lambda: None
     app.dependency_overrides[chat_route.get_embed_query] = lambda: (lambda texts: [[0.0]])
-    app.dependency_overrides[chat_route.get_answerer] = lambda: (lambda q, hits: "Yes, we do. [1]")
+    app.dependency_overrides[chat_route.get_answerer] = lambda: (lambda q, hits, history: "Yes, we do. [1]")
     app.dependency_overrides[rate_limit] = lambda: None
     yield TestClient(app, raise_server_exceptions=False)
     app.dependency_overrides.clear()
@@ -174,7 +213,7 @@ def test_route_rate_limits_with_retry_after():
     app.dependency_overrides[get_settings] = lambda: cfg
     app.dependency_overrides[get_db] = lambda: None
     app.dependency_overrides[chat_route.get_embed_query] = lambda: (lambda texts: [[0.0]])
-    app.dependency_overrides[chat_route.get_answerer] = lambda: (lambda q, hits: "ok")
+    app.dependency_overrides[chat_route.get_answerer] = lambda: (lambda q, hits, history: "ok")
     chat_service.retrieve = lambda *a, **k: []
     try:
         c = TestClient(app)

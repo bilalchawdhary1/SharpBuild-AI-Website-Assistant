@@ -1,9 +1,16 @@
+from typing import Literal
 from pydantic import BaseModel, Field, field_validator
+
+
+class ChatTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    text: str = Field(min_length=1, max_length=500)
 
 
 class ChatRequest(BaseModel):
     # Real visitor questions are short; a tight cap limits cost and prompt-injection payloads.
     message: str = Field(min_length=1, max_length=500)
+    history: list[ChatTurn] = Field(default_factory=list, max_length=6)
 
     @field_validator("message")
     @classmethod

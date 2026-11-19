@@ -6,17 +6,23 @@ Two ways to answer, sharing the same first steps (prepare):
 """
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterator
 
 from sqlalchemy.orm import Session
 
-from app.schemas.chat import ChatResponse, ChatSource
+from app.schemas.chat import ChatResponse, ChatSource, ChatTurn
 from app.services.ai_service import NO_ANSWER, NO_ANSWER_MARKER, UNAVAILABLE, AnswerFn, StreamFn
 from app.services.embeddings import EmbedFn
 from app.services.knowledge_service import Hit, retrieve
+from app.services.intent import detect_intent
 from app.services.smalltalk import smalltalk_reply
-from app.services.streaming import CitationStripper, sources_from_citations, stream_events
+from app.services.streaming import (
+    CitationStripper,
+    is_clarifying_question,
+    sources_from_citations,
+    stream_events,
+)
 
 logger = logging.getLogger("sharpbuild.chat")
 
@@ -35,6 +41,7 @@ class Generate:
     top: float
     retrieve_ms: float
     started: float
+    history: list[ChatTurn] = field(default_factory=list)
 
 
 def attach_sources(answer: str, hits: list[Hit]) -> tuple[str, list[ChatSource]]:
@@ -57,7 +64,11 @@ def _log(outcome: str, top: float, question: str, retrieve_ms: float, answer_ms:
                 outcome, top, len(question), retrieve_ms, answer_ms, (time.perf_counter() - started) * 1000, extra)
 
 
-def prepare(db: Session, question: str, embed_query: EmbedFn, *, min_similarity: float, k: int) -> Ready | Generate:
+def prepare(db: Session, question: str, embed_query: EmbedFn, *, min_similarity: float, k: int,
+            history: list[ChatTurn] | None = None) -> Ready | Generate:
+    history = history or []
+    intent = detect_intent(question)
+    logger.info("chat intent=%s question_chars=%d", intent, len(question))
     canned = smalltalk_reply(question)
     if canned:                               # greetings/thanks/personal chatter: no embedding, no LLM
         logger.info("chat outcome=smalltalk question_chars=%d", len(question))
@@ -76,12 +87,12 @@ def prepare(db: Session, question: str, embed_query: EmbedFn, *, min_similarity:
     if not relevant:
         _log("below_threshold", top, question, retrieve_ms, 0.0, started)
         return Ready(_fallback(NO_ANSWER))
-    return Generate(question, relevant, top, retrieve_ms, started)
+    return Generate(question, relevant, top, retrieve_ms, started, history)
 
 
 def answer_question(db: Session, question: str, embed_query: EmbedFn, answerer: AnswerFn,
-                    *, min_similarity: float, k: int) -> ChatResponse:
-    prepared = prepare(db, question, embed_query, min_similarity=min_similarity, k=k)
+                    *, min_similarity: float, k: int, history: list[ChatTurn] | None = None) -> ChatResponse:
+    prepared = prepare(db, question, embed_query, min_similarity=min_similarity, k=k, history=history)
     if isinstance(prepared, Ready):
         return prepared.response
 
@@ -89,12 +100,15 @@ def answer_question(db: Session, question: str, embed_query: EmbedFn, answerer: 
     answer_started = time.perf_counter()
     answer_ms = 0.0
     try:
-        raw = answerer(prepared.question, prepared.hits)
+        raw = answerer(prepared.question, prepared.hits, prepared.history)
         answer_ms = (time.perf_counter() - answer_started) * 1000
         if NO_ANSWER_MARKER in raw:
             outcome = "model_no_answer"
             return _fallback(NO_ANSWER)
         text, sources = attach_sources(raw, prepared.hits)
+        if text.strip() and not sources and not is_clarifying_question(text):
+            outcome = "model_no_answer"
+            return _fallback(NO_ANSWER)
         outcome = "answered"
         return ChatResponse(answer=text, sources=sources, fallback=False)
     except Exception:
@@ -116,7 +130,8 @@ def stream_answer(prepared: Generate, streamer: StreamFn) -> Iterator[dict]:
     answer_started = time.perf_counter()
     first_token_ms: float | None = None
     try:
-        for event in stream_events(streamer(prepared.question, prepared.hits), prepared.hits):
+        history = prepared.history or []
+        for event in stream_events(streamer(prepared.question, prepared.hits, history), prepared.hits):
             if event["type"] == "no_answer":
                 outcome = "model_no_answer"
                 yield done_event(_fallback(NO_ANSWER))

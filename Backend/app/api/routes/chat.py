@@ -11,7 +11,7 @@ from app.db.session import get_db
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.ai_service import make_gemini_answerer, make_gemini_streamer
 from app.services.chat_service import Ready, answer_question, done_event, prepare, stream_answer
-from app.services.embeddings import make_gemini_embedder, with_retries
+from app.services.embeddings import make_embedding_cache, make_gemini_embedder, with_retries
 
 router = APIRouter()
 # One quick retry only: a visitor is waiting, so don't sleep through long back-offs.
@@ -26,7 +26,8 @@ def require_ai(settings: Settings = Depends(get_settings)) -> Settings:
 
 @lru_cache      # build each Gemini client once, not on every request
 def _embedder(api_key: str, model: str):
-    return with_retries(make_gemini_embedder(api_key, model, "RETRIEVAL_QUERY"), **RETRY)
+    embed = with_retries(make_gemini_embedder(api_key, model, "RETRIEVAL_QUERY"), **RETRY)
+    return make_embedding_cache(embed)
 
 
 @lru_cache
@@ -56,7 +57,8 @@ def chat(request: ChatRequest,
          embed_query=Depends(get_embed_query),
          answerer=Depends(get_answerer)) -> ChatResponse:
     return answer_question(db, request.message, embed_query, answerer,
-                           min_similarity=settings.min_similarity, k=settings.retrieval_k)
+                           min_similarity=settings.min_similarity, k=settings.retrieval_k,
+                           history=request.history)
 
 
 def get_streamer(settings: Settings = Depends(require_ai)):
@@ -70,14 +72,15 @@ def sse(event: dict) -> str:
 
 @router.post("/chat/stream", dependencies=[Depends(rate_limit)])
 def chat_stream(request: ChatRequest,
-                db: Session = Depends(get_db),
+                db: Session = Depends(get_db, scope="function"),
                 settings: Settings = Depends(require_ai),
                 embed_query=Depends(get_embed_query),
                 streamer=Depends(get_streamer)) -> StreamingResponse:
-    # Retrieval uses the database session, so it finishes HERE, before streaming starts:
-    # the session is closed once this function returns.
+    # Retrieval finishes before streaming; close the DB session before the response body
+    # starts so it doesn't hold a pooled connection while Gemini generates the answer.
     prepared = prepare(db, request.message, embed_query,
-                       min_similarity=settings.min_similarity, k=settings.retrieval_k)
+                       min_similarity=settings.min_similarity, k=settings.retrieval_k,
+                       history=request.history)
 
     def events():
         yield sse({"type": "start"})

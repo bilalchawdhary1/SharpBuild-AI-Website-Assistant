@@ -29,10 +29,11 @@ class ApiError(Exception):
 class StreamModels:
     """Each model name maps to: an exception to raise on call, or a list of chunk texts (an Exception item raises mid-stream)."""
     def __init__(self, scripts):
-        self.scripts, self.calls = scripts, []
+        self.scripts, self.calls, self.config_calls = scripts, [], []
 
     def generate_content_stream(self, *, model, contents, config):
         self.calls.append(model)
+        self.config_calls.append(config)
         script = self.scripts[model]
         if isinstance(script, Exception):
             raise script
@@ -51,8 +52,9 @@ def streamer(scripts, fallbacks=("backup",)):
 
 
 def test_streamer_yields_text_pieces_in_order_and_skips_empty_chunks():
-    s, _ = streamer({"main": [None, "", "Hello", None, " world", ""]})
+    s, models = streamer({"main": [None, "", "Hello", None, " world", ""]})
     assert list(s("q", [hit()])) == ["Hello", " world"]
+    assert models.config_calls[0].max_output_tokens == 400
 
 
 @pytest.mark.parametrize("failure", [ApiError(503), ApiError(404), ApiError(429)])
@@ -93,14 +95,14 @@ def generate(hits=None):
 
 def test_stream_answer_emits_clean_events_and_logs_first_token_time(caplog):
     with caplog.at_level(logging.INFO, logger="sharpbuild.chat"):
-        events = list(stream_answer(generate(), lambda q, h: iter(["Yes, ", "we do [2]", "."])))
+        events = list(stream_answer(generate(), lambda q, h, history: iter(["Yes, ", "we do [2]", "."])))
     assert [e["type"] for e in events] == ["delta", "delta", "delta", "done"]
     assert events[-1]["answer"] == "Yes, we do." and events[-1]["sources"][0]["url"] == "https://sharpbuild.io/p2"
     assert "outcome=answered" in caplog.text and "first_token_ms=" in caplog.text
 
 
 def test_stream_answer_turns_failures_into_an_error_event_and_never_raises(caplog):
-    def broken(q, h):
+    def broken(q, h, history):
         yield "Part"
         raise RuntimeError("boom")
     with caplog.at_level(logging.INFO, logger="sharpbuild.chat"):
@@ -111,7 +113,7 @@ def test_stream_answer_turns_failures_into_an_error_event_and_never_raises(caplo
 
 
 def test_stream_answer_logs_when_the_visitor_goes_away(caplog):
-    def endless(q, h):
+    def endless(q, h, history):
         while True:
             yield "word "
     gen = stream_answer(generate(), endless)
@@ -122,7 +124,7 @@ def test_stream_answer_logs_when_the_visitor_goes_away(caplog):
 
 
 def test_model_saying_no_answer_becomes_a_fallback_done_event():
-    events = list(stream_answer(generate(), lambda q, h: iter(["[[NO_", "ANSWER]]"])))
+    events = list(stream_answer(generate(), lambda q, h, history: iter(["[[NO_", "ANSWER]]"])))
     assert events == [{"type": "done", "answer": NO_ANSWER, "fallback": True, "sources": []}]
 
 
@@ -137,11 +139,13 @@ def frames(response):
 
 @pytest.fixture
 def api():
-    state = {"stream": lambda q, h: iter(["Yes, we do [1]."]), "hits": [hit(1)]}
+    state = {"stream": lambda q, h, history: iter(["Yes, we do [1]."]), "hits": [hit(1)]}
     app.dependency_overrides[get_settings] = lambda: CFG
     app.dependency_overrides[get_db] = lambda: None
     app.dependency_overrides[chat_route.get_embed_query] = lambda: (lambda t: [[0.0]])
-    app.dependency_overrides[chat_route.get_streamer] = lambda: (lambda q, h: state["stream"](q, h))
+    app.dependency_overrides[chat_route.get_streamer] = lambda: (
+        lambda q, h, history: state["stream"](q, h, history)
+    )
     app.dependency_overrides[rate_limit] = lambda: None
     original = chat_service.retrieve
     chat_service.retrieve = lambda *a, **k: state["hits"]
@@ -161,9 +165,31 @@ def test_endpoint_streams_start_deltas_and_done_with_the_right_headers(api):
     assert events[-1]["answer"] == "Yes, we do." and events[-1]["sources"][0]["title"] == "Title 1"
 
 
+def test_streaming_closes_database_session_before_calling_the_model(api):
+    client, state = api
+    lifecycle = {"closed": False, "closed_during_stream": False}
+
+    def db_dependency():
+        try:
+            yield None
+        finally:
+            lifecycle["closed"] = True
+
+    def stream(q, hits, history):
+        lifecycle["closed_during_stream"] = lifecycle["closed"]
+        yield "Yes, we do [1]."
+
+    app.dependency_overrides[get_db] = db_dependency
+    state["stream"] = stream
+    response = client.post("/chat/stream", json={"message": "Do you build Shopify stores?"})
+
+    assert response.status_code == 200
+    assert lifecycle["closed_during_stream"] is True
+
+
 def test_small_talk_and_weak_matches_answer_without_calling_the_model(api):
     client, state = api
-    state["stream"] = lambda q, h: pytest.fail("the model must not be called")
+    state["stream"] = lambda q, h, history: pytest.fail("the model must not be called")
     smalltalk = frames(client.post("/chat/stream", json={"message": "hello"}))
     assert [e["type"] for e in smalltalk] == ["start", "done"] and not smalltalk[-1]["fallback"]
     state["hits"] = [hit(1, sim=0.3)]
@@ -174,7 +200,7 @@ def test_small_talk_and_weak_matches_answer_without_calling_the_model(api):
 def test_a_failure_halfway_ends_with_an_error_event_after_the_partial_text(api):
     client, state = api
 
-    def half(q, h):
+    def half(q, h, history):
         yield "Partial answer "
         raise RuntimeError("model died")
     state["stream"] = half

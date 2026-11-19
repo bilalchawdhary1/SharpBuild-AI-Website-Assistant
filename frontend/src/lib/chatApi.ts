@@ -5,6 +5,11 @@ export type ChatReply = {
   fallback: boolean;
 };
 
+export type ChatHistoryTurn = {
+  role: "user" | "assistant";
+  text: string;
+};
+
 export type ChatErrorKind =
   | "rate_limited"
   | "network"
@@ -79,13 +84,14 @@ export async function askQuestion(
   message: string,
   signal?: AbortSignal,
   fetchImpl: typeof fetch = fetch,
+  history: ChatHistoryTurn[] = [],
 ): Promise<ChatReply> {
   let response: Response;
   try {
     response = await fetchImpl(`${API_URL}/chat`, {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({message}),
+      body: JSON.stringify(history.length ? {message, history} : {message}),
       signal,
     });
   } catch (error) {
@@ -116,6 +122,7 @@ export async function askQuestion(
 
 export type StreamHandlers = {
   signal?: AbortSignal;
+  history?: ChatHistoryTurn[];
   /** Called with each new piece of the answer text as it arrives. */
   onDelta?: (text: string) => void;
 };
@@ -124,7 +131,7 @@ export type StreamHandlers = {
  *  `onDelta` receives the text piece by piece while the answer is being written. */
 export async function askQuestionStream(
   message: string,
-  {signal, onDelta}: StreamHandlers = {},
+  {signal, onDelta, history = []}: StreamHandlers = {},
   fetchImpl: typeof fetch = fetch,
 ): Promise<ChatReply> {
   let response: Response;
@@ -135,7 +142,7 @@ export async function askQuestionStream(
         "Content-Type": "application/json",
         Accept: "text/event-stream",
       },
-      body: JSON.stringify({message}),
+      body: JSON.stringify(history.length ? {message, history} : {message}),
       signal,
     });
   } catch (error) {
@@ -146,7 +153,7 @@ export async function askQuestionStream(
 
   // A backend without the streaming endpoint (older deployment): use the plain endpoint instead.
   if (response.status === 404 || response.status === 405)
-    return askQuestion(message, signal, fetchImpl);
+    return askQuestion(message, signal, fetchImpl, history);
   throwForStatus(response);
 
   let final: ChatReply | null = null;
