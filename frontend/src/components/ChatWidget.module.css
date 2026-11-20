@@ -4,6 +4,7 @@
   --muted: #64748b;
   --line: #e2e8f0;
   --accent: #635bff;
+  --accent-text: #4f46e5; /* the accent, darkened to 6:1 contrast for small text */
   --accent-fg: #ffffff;
   --user-bg: #0f172a;
   --bot-bg: #f8fafc;
@@ -241,9 +242,9 @@
 .sourceChip {
   display: block;
   max-width: 100%;
-  padding: 4px 10px;
+  padding: 6px 10px;
   font-size: 0.76rem;
-  color: var(--accent);
+  color: var(--accent-text);
   text-decoration: none;
   border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
   border-radius: 9px;
@@ -264,7 +265,7 @@
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
-  color: var(--accent);
+  color: var(--accent-text);
   background: transparent;
   border: 1px solid var(--accent);
   border-radius: 10px;
@@ -310,6 +311,24 @@
   transform: translateY(-1px);
 }
 
+.leadButton {
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 8px 13px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--accent-text);
+  cursor: pointer;
+}
+.leadButton:hover {
+  background: #f8faff;
+}
+.leadButton:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
 .contactLink {
   font-size: 0.82rem;
   padding: 8px 13px;
@@ -347,7 +366,7 @@
 
 .chip:hover {
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
   background: #f8faff;
   transform: translateY(-1px);
 }
@@ -547,4 +566,15 @@
   font-size: 0.8rem;
   color: var(--muted);
   font-style: italic;
+}
+/* Comfortable touch targets on phones (WCAG recommends 44px). */
+@media (max-width: 520px) {
+  .iconButton {
+    width: 44px;
+    height: 44px;
+  }
+
+  .sourceChip {
+    padding: 9px 12px;
+  }
 }

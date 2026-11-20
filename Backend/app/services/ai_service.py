@@ -14,6 +14,10 @@ NO_ANSWER = (
     "I couldn't find that information in SharpBuild's published materials. "
     f"Please contact {CONTACT_EMAIL} for help."
 )
+HANDOFF = (
+    "Of course, I'll connect you with the SharpBuild team. "
+    f"Leave your details in the form below, or email {CONTACT_EMAIL} if you prefer."
+)
 UNAVAILABLE = (
     "I'm having trouble answering right now. Please try again in a moment, "
     f"or email {CONTACT_EMAIL}."

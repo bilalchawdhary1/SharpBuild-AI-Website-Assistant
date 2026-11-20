@@ -1,8 +1,17 @@
 export type ChatSource = {url: string; title: string; section: string};
+/** Sales hint from the backend: which detail would help most next ("contact" = offer the lead form). */
+export type LeadHint = {
+  score: "hot" | "warm" | "cold";
+  nextField: string | null;
+};
+
 export type ChatReply = {
   answer: string;
   sources: ChatSource[];
   fallback: boolean;
+  lead?: LeadHint;
+  /** The visitor asked for a person: the widget opens the contact form straight away. */
+  handoff?: true;
 };
 
 export type ChatHistoryTurn = {
@@ -29,7 +38,7 @@ export class ChatApiError extends Error {
 
 import {parseSse} from "./sse";
 
-const API_URL = (
+export const API_URL = (
   process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000"
 ).replace(/\/+$/, "");
 
@@ -41,6 +50,13 @@ export function isSafeUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function parseLead(value: unknown): LeadHint | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const {score, next_field} = value as Record<string, unknown>;
+  if (score !== "hot" && score !== "warm" && score !== "cold") return undefined;
+  return {score, nextField: typeof next_field === "string" ? next_field : null};
 }
 
 function parseReply(data: unknown): ChatReply | null {
@@ -59,10 +75,17 @@ function parseReply(data: unknown): ChatReply | null {
         section: typeof section === "string" ? section : "",
       });
   }
-  return {answer, sources: clean, fallback: fallback === true};
+  const reply: ChatReply = {answer, sources: clean, fallback: fallback === true};
+  const fields = data as Record<string, unknown>;
+  const lead = parseLead(fields.lead);
+  const extras = {
+    ...(lead ? {lead} : {}),
+    ...(fields.intent === "human_handoff" ? {handoff: true as const} : {}),
+  };
+  return Object.keys(extras).length ? {...reply, ...extras} : reply; // optional keys only when sent
 }
 
-function throwForStatus(response: Response): void {
+export function throwForStatus(response: Response): void {
   if (response.status === 429) {
     const seconds = Number(response.headers.get("Retry-After"));
     throw new ChatApiError(

@@ -125,12 +125,11 @@ def test_stream_answer_logs_when_the_visitor_goes_away(caplog):
 
 def test_model_saying_no_answer_becomes_a_fallback_done_event():
     events = list(stream_answer(generate(), lambda q, h, history: iter(["[[NO_", "ANSWER]]"])))
-    assert events == [{"type": "done", "answer": NO_ANSWER, "fallback": True, "sources": []}]
-
+    assert events == [{"type": "done", "answer": NO_ANSWER, "fallback": True, "sources": [], "intent": "information"}]
 
 # ---------- HTTP endpoint ----------
 CFG = SimpleNamespace(gemini_api_key="k", embedding_model="e", generation_model="g", min_similarity=0.58,
-                      retrieval_k=4, rate_limit_per_minute=100, global_rate_limit_per_minute=100)
+                    retrieval_k=4, rate_limit_per_minute=100, global_rate_limit_per_minute=100)
 
 
 def frames(response):
@@ -194,7 +193,7 @@ def test_small_talk_and_weak_matches_answer_without_calling_the_model(api):
     assert [e["type"] for e in smalltalk] == ["start", "done"] and not smalltalk[-1]["fallback"]
     state["hits"] = [hit(1, sim=0.3)]
     weak = frames(client.post("/chat/stream", json={"message": "weather in Paris?"}))
-    assert weak[-1] == {"type": "done", "answer": NO_ANSWER, "fallback": True, "sources": []}
+    assert weak[-1] == {"type": "done", "answer": NO_ANSWER, "fallback": True, "sources": [], "intent": "information"}
 
 
 def test_a_failure_halfway_ends_with_an_error_event_after_the_partial_text(api):

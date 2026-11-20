@@ -16,6 +16,9 @@ engine = create_engine(
     max_overflow=2,
     pool_recycle=300,
     connect_args=CONNECT_ARGS,
+    # Database errors normally quote the SQL parameters, which for a failed lead insert means the
+    # visitor's name, email and phone would end up in the logs. Hide them.
+    hide_parameters=True,
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False)
 

@@ -15,8 +15,11 @@ import {
   type ChatSource,
 } from "@/lib/chatApi";
 import {ASK_EVENT} from "@/lib/events";
+import {isNearBottom, prefersReducedMotion} from "@/lib/motion";
+import {submitLead as defaultSubmitLead} from "@/lib/leadApi";
 import {commonPrefixLength, nextShown} from "@/lib/typewriter";
 import AnswerBody from "./AnswerBody";
+import LeadForm from "./LeadForm";
 import styles from "./ChatWidget.module.css";
 
 export const CONTACT_EMAIL = "hello@sharpbuild.io";
@@ -37,6 +40,10 @@ type AssistantMessage = {
   text: string;
   sources: ChatSource[];
   needsHuman: boolean;
+  /** The backend saw a sales conversation and contact details are the next useful thing. */
+  wantsContact?: boolean;
+  /** The visitor asked for a person: the lead form opens automatically in "handoff" mode. */
+  handoff?: boolean;
   streaming?: boolean;
   note?: string;
   retryQuestion?: string;
@@ -56,6 +63,8 @@ type StreamState = {
 type Props = {
   /** Injected in tests; defaults to the real streaming API call. */
   ask?: typeof defaultAsk;
+  /** Injected in tests; defaults to the real POST /lead call. */
+  submitLead?: typeof defaultSubmitLead;
   defaultOpen?: boolean;
   /** Show a "still working" hint after this many milliseconds without any text. */
   slowHintMs?: number;
@@ -109,10 +118,15 @@ const ICONS = {
   reset: "M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5",
 };
 
-function HumanContact() {
+function HumanContact({onLeave}: {onLeave?: () => void}) {
   return (
     <div className={styles.contact}>
       <p className={styles.contactTitle}>Want to talk to a person?</p>
+      {onLeave && (
+        <button type='button' className={styles.leadButton} onClick={onLeave}>
+          Leave your details
+        </button>
+      )}
       <a className={styles.contactPrimary} href={`mailto:${CONTACT_EMAIL}`}>
         Talk to a human
       </a>
@@ -130,6 +144,7 @@ function HumanContact() {
 
 export default function ChatWidget({
   ask = defaultAsk,
+  submitLead = defaultSubmitLead,
   defaultOpen = false,
   slowHintMs = 6000,
   tickMs = 28,
@@ -139,6 +154,9 @@ export default function ChatWidget({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [slow, setSlow] = useState(false);
+  const [leadOpenFor, setLeadOpenFor] = useState<number | null>(null); // message that shows the lead form
+  const [leadSent, setLeadSent] = useState(false);
+  const leadSentRef = useRef(false); // the timer callbacks need the current value, not a stale render's
   const nextId = useRef(1);
   const loadingRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -146,6 +164,8 @@ export default function ChatWidget({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const launcherRef = useRef<HTMLButtonElement>(null);
+  const stickRef = useRef(true); // false once the visitor scrolls up to read earlier messages
   const panelId = useId();
 
   const hasStreamingText = messages.some(
@@ -165,12 +185,15 @@ export default function ChatWidget({
     [],
   );
   useEffect(() => {
-    if (open) inputRef.current?.focus();
+    if (open) {
+      stickRef.current = true; // reopening shows the latest message
+      inputRef.current?.focus();
+    }
   }, [open]);
   useEffect(() => {
     const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, loading, slow]);
+    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
+  }, [open, messages, loading, slow]);
   useEffect(() => {
     if (!loading || hasStreamingText) {
       setSlow(false);
@@ -231,8 +254,11 @@ export default function ChatWidget({
         text: state.final.answer,
         sources: state.final.sources,
         needsHuman: state.final.fallback,
+        wantsContact: state.final.lead?.nextField === "contact",
+        handoff: state.final.handoff === true,
         streaming: false,
       });
+      if (state.final.handoff && !leadSentRef.current) setLeadOpenFor(state.id);
     }
   };
 
@@ -240,7 +266,10 @@ export default function ChatWidget({
     const state = streamRef.current;
     if (!state) return;
     if (state.shown < state.received.length) {
-      state.shown = nextShown(state.shown, state.received.length);
+      // Visitors who ask for reduced motion get the text at once instead of a typing effect.
+      state.shown = prefersReducedMotion()
+        ? state.received.length
+        : nextShown(state.shown, state.received.length);
       show(state);
     }
     // Everything that arrived is visible and the request has ended: show sources and finish.
@@ -257,6 +286,7 @@ export default function ChatWidget({
       const text = raw.trim();
       if (!text || loadingRef.current) return;
       loadingRef.current = true;
+      stickRef.current = true; // a new question always scrolls to the answer
       if (echo)
         setMessages(m => [...m, {id: nextId.current++, role: "user", text}]);
       setInput("");
@@ -315,6 +345,12 @@ export default function ChatWidget({
     return () => window.removeEventListener(ASK_EVENT, onAsk);
   }, []);
 
+  /** Closing must not strand keyboard users: put focus back on the button that opens the chat. */
+  const close = () => {
+    setOpen(false);
+    launcherRef.current?.focus();
+  };
+
   const stop = () => {
     const state = streamRef.current;
     if (!state) return;
@@ -341,6 +377,9 @@ export default function ChatWidget({
     setMessages([]);
     setInput("");
     setLoading(false);
+    setLeadOpenFor(null);
+    setLeadSent(false);
+    leadSentRef.current = false;
     inputRef.current?.focus();
   };
 
@@ -362,7 +401,7 @@ export default function ChatWidget({
           aria-label='SharpBuild assistant'
           className={styles.panel}
           onKeyDown={e => {
-            if (e.key === "Escape") setOpen(false);
+            if (e.key === "Escape") close();
           }}
         >
           <header className={styles.header}>
@@ -387,7 +426,7 @@ export default function ChatWidget({
             <button
               type='button'
               className={styles.iconButton}
-              onClick={() => setOpen(false)}
+              onClick={close}
               aria-label='Close chat'
               title='Close'
             >
@@ -401,6 +440,9 @@ export default function ChatWidget({
             role='log'
             aria-live='polite'
             aria-label='Conversation'
+            onScroll={e => {
+              stickRef.current = isNearBottom(e.currentTarget);
+            }}
           >
             <div className={`${styles.bubble} ${styles.assistant}`}>
               <p className={styles.plain}>
@@ -461,7 +503,27 @@ export default function ChatWidget({
                       Try again
                     </button>
                   )}
-                  {!m.streaming && m.needsHuman && <HumanContact />}
+                  {!m.streaming &&
+                    (m.needsHuman || m.wantsContact) &&
+                    (leadOpenFor === m.id ? (
+                      <LeadForm
+                        history={conversationHistory(messages)}
+                        kind={m.handoff ? "handoff" : "sales"}
+                        submit={submitLead}
+                        onSent={() => {
+                          leadSentRef.current = true;
+                          setLeadSent(true);
+                        }}
+                        onCancel={() => {
+                          setLeadOpenFor(null);
+                          inputRef.current?.focus();
+                        }}
+                      />
+                    ) : (
+                      <HumanContact
+                        onLeave={leadSent ? undefined : () => setLeadOpenFor(m.id)}
+                      />
+                    ))}
                 </div>
               ),
             )}
@@ -535,13 +597,15 @@ export default function ChatWidget({
                 {input.length}/{MAX_LENGTH} ·{" "}
               </span>
             )}
-            AI can make mistakes. Don&apos;t share personal or sensitive
-            information; questions are processed by Google&apos;s Gemini API.
+            AI can make mistakes. Don&apos;t type personal or sensitive
+            information in the chat; questions are processed by Google&apos;s
+            Gemini API. Contact details go only through the optional form.
           </p>
         </section>
       )}
 
       <button
+        ref={launcherRef}
         type='button'
         className={styles.launcher}
         aria-expanded={open}

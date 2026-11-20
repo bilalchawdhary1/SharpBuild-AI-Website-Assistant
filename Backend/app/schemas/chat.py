@@ -27,7 +27,20 @@ class ChatSource(BaseModel):
     section: str
 
 
+class LeadInfo(BaseModel):
+    """Qualification picture for sales conversations. Booleans only: never the visitor's details."""
+    score: Literal["hot", "warm", "cold"]
+    need: bool
+    budget: bool
+    timeline: bool
+    contact: bool
+    next_field: str | None = None       # the most useful thing still unknown
+    next_question: str | None = None    # suggested follow-up; None when it needs consent first
+
+
 class ChatResponse(BaseModel):
     answer: str
     sources: list[ChatSource]
     fallback: bool = False      # True: no grounded answer; the widget should offer human contact
+    intent: str | None = None   # routing label from services/intent.py; informational for the widget
+    lead: LeadInfo | None = None  # only present when the conversation shows a sales signal

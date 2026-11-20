@@ -3,6 +3,8 @@ from sqlalchemy import text
 from app.db.base import Base
 from app.db.session import engine
 import app.models.chunk  # noqa: F401  (importing registers the table on Base)
+import app.models.lead  # noqa: F401
+import app.models.rate_limit  # noqa: F401
 
 with engine.begin() as conn:
     conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))

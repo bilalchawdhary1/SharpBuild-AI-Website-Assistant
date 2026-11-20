@@ -62,5 +62,5 @@ def test_detect_intent(message, expected):
 
 
 def test_intent_does_not_hijack_real_questions():
-    assert detect_intent("Hello, do you build Shopify stores?") == "project_request"
+    assert detect_intent("Hello, do you build Shopify stores?") == "information"
     assert detect_intent("Thanks, but what is your process?") == "information"
