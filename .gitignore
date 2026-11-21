@@ -1,23 +1,18 @@
 @"
-# Environment variables
+node_modules/
+.next/
+.venv/
+.vercel/
 .env
 .env.*
 !.env.example
-
-# Python
+!.env.*.example
 __pycache__/
-*.py[cod]
-.venv/
-venv/
+*.pyc
 .pytest_cache/
-
-# Node
-node_modules/
-.next/
-dist/
+*.tsbuildinfo
+*.log
 coverage/
-
-# IDE
-.vscode/
-.idea/
+body.json
+report.json
 "@ | Set-Content .gitignore

@@ -1,4 +1,5 @@
 import logging
+import os
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,11 +12,17 @@ from app.api.routes.admin import router as admin_router
 from app.api.routes.lead import router as lead_router
 from app.core.config import get_settings
 from app.core.observability import RequestLogMiddleware, configure_logging
+from app.core.preflight import check as preflight_check, is_production
 from app.core.security import SecurityMiddleware
 from app.db.session import get_db
 
 settings = get_settings()
 configure_logging(settings.log_format, settings.log_level)
+if is_production(os.environ):        # loud in the logs, but never stops the site from answering
+    for finding in preflight_check(settings, os.environ, production=True):
+        logging.getLogger("sharpbuild.preflight").log(
+            logging.ERROR if finding.level == "error" else logging.WARNING,
+            "preflight %s: %s", finding.code, finding.message)
 app = FastAPI(
     title=settings.app_name,
     docs_url="/docs" if settings.enable_docs else None,

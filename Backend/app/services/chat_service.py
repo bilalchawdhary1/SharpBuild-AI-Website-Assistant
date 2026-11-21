@@ -21,6 +21,7 @@ from app.services.smalltalk import smalltalk_reply
 from app.services.streaming import (
     CitationStripper,
     is_clarifying_question,
+    requires_grounded_source,
     sources_from_citations,
     stream_events,
 )
@@ -164,6 +165,12 @@ def stream_answer(prepared: Generate, streamer: StreamFn) -> Iterator[dict]:
             if event["type"] == "delta" and first_token_ms is None:
                 first_token_ms = (time.perf_counter() - answer_started) * 1000
             if event["type"] == "done":
+                # Same rule as answer_question: a factual answer that cites no retrieved page is not
+                # trusted. (The visitor has already seen the streamed text; the final event replaces it.)
+                if requires_grounded_source(event["answer"]) and not event["sources"]:
+                    outcome = "model_no_answer"
+                    yield done_event(_fallback(NO_ANSWER, prepared.intent, prepared.lead))
+                    return
                 outcome = "answered"
                 event["intent"] = prepared.intent
                 if prepared.lead is not None:
